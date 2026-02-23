@@ -143,7 +143,7 @@ This template covers the basics — Server Components + Streaming SSR — but th
 | Feature | Status | Alternative |
 |---|---|---|
 | **Server Actions** (`"use server"`) | ❌ Not supported | Waku, Next.js |
-| **Client Components** (`"use client"`) | ⚠️ Manual wiring needed | — |
+| **Client Components** (`"use client"`) | ✅ Works automatically | — |
 | **Nested layouts** | ❌ Not supported | Waku, Next.js |
 | **File-based routing** | ❌ Manual registration | — |
 | **Cloudflare bindings** (KV, D1, R2) | ❌ `env` not threaded through | — |
