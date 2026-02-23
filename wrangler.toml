@@ -1,0 +1,7 @@
+name = "hono-rsc-template"
+main = "dist/worker-entry.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./dist/client"
