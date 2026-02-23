@@ -135,7 +135,21 @@ This repo's commit history shows the evolution:
 2. **`refactor: integrate RSC as Hono middleware`** — Current design.  
    Hono handles all routing. RSC rendering via `rscMiddleware` + `renderPage` context.
 
-## Known Limitations
+## ⚠️ Scope: What This Template Does NOT Cover
 
-- **Cloudflare bindings** (KV, D1, R2): `env` is not yet passed to the Hono app
-- **File-based routing**: Pages are manually registered in `src/index.tsx`
+`@vitejs/plugin-rsc` is a **low-level RSC protocol implementation**, not a full RSC framework.
+This template covers the basics — Server Components + Streaming SSR — but the following are **not implemented**:
+
+| Feature | Status | Alternative |
+|---|---|---|
+| **Server Actions** (`"use server"`) | ❌ Not supported | Waku, Next.js |
+| **Client Components** (`"use client"`) | ⚠️ Manual wiring needed | — |
+| **Nested layouts** | ❌ Not supported | Waku, Next.js |
+| **File-based routing** | ❌ Manual registration | — |
+| **Cloudflare bindings** (KV, D1, R2) | ❌ `env` not threaded through | — |
+
+If you need Server Actions or a full RSC feature set, consider:
+- **[Waku](https://waku.gg/)** — Minimal RSC framework with full feature support
+- **[Next.js](https://nextjs.org/)** — Production-grade RSC framework
+
+This template is for those who want **RSC rendering + Hono API on Workers**, with full control over the stack and minimal abstractions.
