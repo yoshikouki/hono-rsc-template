@@ -7,7 +7,7 @@ A minimal template for running **React Server Components** on **Cloudflare Worke
 ## Stack
 
 - **React 19** — Server Components + Streaming SSR
-- **Hono** — API routes and middleware
+- **Hono** — Handles all routing (pages + API)
 - **`@vitejs/plugin-rsc`** — RSC protocol implementation (Vite 6 Environment API)
 - **Cloudflare Workers** — edge runtime
 
@@ -21,15 +21,55 @@ bun run preview  # wrangler dev --local
 bun run deploy   # deploy to Cloudflare Workers
 ```
 
-## How It Works
+## Architecture
 
 `@vitejs/plugin-rsc` manages three separate build environments:
 
 | Environment | Role | Runtime |
 |---|---|---|
-| `rsc` | Render Server Components | Cloudflare Workers (workerd) |
-| `ssr` | Convert RSC stream → HTML, run Hono | Node.js (dev) / Workers (prod) |
-| `client` | Hydration in the browser | Browser |
+| `rsc` | RSC rendering + all routing | Cloudflare Workers (workerd) |
+| `ssr` | Convert RSC stream → HTML | Node.js (dev) / Workers (prod) |
+| `client` | Hydration | Browser |
+
+### Design: Hono Routes Everything
+
+RSC is implemented as a **Hono middleware** (`rscMiddleware`).  
+This means all routing — pages and API — lives in one Hono app.
+
+```
+entry.rsc.tsx               entry.ssr.tsx           entry.browser.tsx
+     │                            │                        │
+     │  handler(request)          │                        │
+     │  ┌─────────────────┐       │                        │
+     │  │ .rsc suffix?    │       │                        │
+     │  │ → rewrite to    │       │                        │
+     │  │   X-RSC-Request │       │                        │
+     │  └────────┬────────┘       │                        │
+     │           │                │                        │
+     │    app.fetch(request)       │                        │
+     │    (Hono with rscMiddleware)│                        │
+     │           │                │                        │
+     │   ┌───────▼────────┐       │                        │
+     │   │ rscMiddleware  │       │                        │
+     │   │ injects        │       │                        │
+     │   │ renderPage()   │       │                        │
+     │   └───────┬────────┘       │                        │
+     │           │                │                        │
+     │   ┌───────▼────────┐       │                        │
+     │   │ GET /          │       │                        │
+     │   │ renderPage(    │       │                        │
+     │   │   request,     │       │                        │
+     │   │   loader       │       │                        │
+     │   │ )              │       │                        │
+     │   └───────┬────────┘       │                        │
+     │           │ RSC stream     │                        │
+     │           └────────────────► handleSsr()            │
+     │                            │ → HTML stream          │
+     │                                                     │
+     │   ┌───────────────────────────────────────────┐     │
+     │   │ GET /api/hello → c.json({...})            │     │
+     │   └───────────────────────────────────────────┘     │
+```
 
 ### Request Flow
 
@@ -37,32 +77,25 @@ bun run deploy   # deploy to Cloudflare Workers
 
 ```
 Browser → GET /
-  → entry.rsc.tsx:  pages["/"] matched
-  → renderToReadableStream(<HomePage />) → RSC stream (React Flight Protocol)
-  → entry.ssr.tsx:  createFromReadableStream() → React tree
-  → renderToReadableStream(root)         → HTML stream
-  → Response: Content-Type: text/html
+  → entry.rsc.tsx:  sanitizeRscHeader, app.fetch()
+  → rscMiddleware:  isRsc=false, inject renderPage into context
+  → GET / handler:  renderPage(request, HomePageLoader)
+  → renderPage:     renderToReadableStream(<HomePage />) → RSC stream
+  → entry.ssr.tsx:  createFromReadableStream() + renderToReadableStream()
+  → Response:       Content-Type: text/html, Vary: X-RSC-Request
 ```
 
-**Hydration (after HTML is displayed)**
+**Hydration**
 
 ```
-Browser → GET /.rsc   (triggered by bootstrapScriptContent)
-  → entry.rsc.tsx:  isRsc = true, same page loaded
-  → renderToReadableStream(<HomePage />) → RSC stream
-  → Response: Content-Type: text/x-component
-  
+Browser → GET /.rsc  (bootstrapScriptContent triggers this)
+  → entry.rsc.tsx:  .rsc suffix → strip → set X-RSC-Request: 1
+  → rscMiddleware:  isRsc=true
+  → GET / handler:  renderPage(request, HomePageLoader)
+  → renderPage:     return RSC stream directly
+  → Response:       Content-Type: text/x-component, Vary: X-RSC-Request
+
 Browser: createFromReadableStream(body) → hydrateRoot(document, root)
-```
-
-**API request**
-
-```
-Browser → GET /api/hello
-  → entry.rsc.tsx:  no page matched
-  → entry.ssr.tsx:  handleHono(request) → app.fetch(request)
-  → Hono router:    GET /api/hello handler
-  → Response: application/json
 ```
 
 ## File Structure
@@ -70,35 +103,39 @@ Browser → GET /api/hello
 ```
 src/
 ├── framework/
-│   ├── entry.rsc.tsx     # RSC environment entry — page routing + RSC rendering
-│   ├── entry.ssr.tsx     # SSR environment — RSC→HTML + Hono delegation
-│   └── entry.browser.tsx # Browser — hydration + HMR
+│   ├── entry.rsc.tsx     # RSC env — rscMiddleware, handler, sanitizeRscHeader
+│   ├── entry.ssr.tsx     # SSR env — RSC stream → HTML
+│   └── entry.browser.tsx # Browser — .rsc fetch + hydrateRoot
 ├── pages/
-│   └── home.tsx          # Example Server Component page
-└── index.tsx             # Hono app (API routes)
+│   └── home.tsx          # Example Server Component
+└── index.tsx             # Hono app — createApp(), page routes, API routes
 ```
 
 ## Adding a Page
 
 1. Create `src/pages/my-page.tsx` and export a Server Component
-2. Add an entry in `entry.rsc.tsx`:
+2. Register it in `src/index.tsx`:
 
 ```tsx
-const pages = {
-  "/my-page": () =>
-    import("@/pages/my-page").then((m) => ({ default: m.MyPage })),
-};
+app.get("/my-page", (c) =>
+  c.get("renderPage")(
+    c.req.raw,
+    () => import("@/pages/my-page").then((m) => ({ default: m.MyPage }))
+  )
+);
 ```
 
-## Adding an API Route
+## Commit History
 
-Edit `src/index.tsx`:
+This repo's commit history shows the evolution:
 
-```tsx
-app.get("/api/my-endpoint", (c) => c.json({ data: "..." }));
-```
+1. **`init: naive plugin-rsc + Hono fallback`** — The simplest working setup.  
+   `pages` object in `entry.rsc.tsx`, Hono only for unmatched routes.
+
+2. **`refactor: integrate RSC as Hono middleware`** — Current design.  
+   Hono handles all routing. RSC rendering via `rscMiddleware` + `renderPage` context.
 
 ## Known Limitations
 
-- **Cloudflare bindings** (KV, D1, R2): `env` is not yet threaded through to the Hono app
-- **File-based routing**: Pages are manually registered in `entry.rsc.tsx`
+- **Cloudflare bindings** (KV, D1, R2): `env` is not yet passed to the Hono app
+- **File-based routing**: Pages are manually registered in `src/index.tsx`

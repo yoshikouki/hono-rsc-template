@@ -1,18 +1,23 @@
 import { createFromReadableStream } from "@vitejs/plugin-rsc/ssr";
 import { renderToReadableStream } from "react-dom/server.edge";
-import app from "@/index";
 
+// Cache bootstrap script lookup across requests (it's the same for all pages)
 const bootstrapScriptContentPromise =
   import.meta.viteRsc.loadBootstrapScriptContent("index");
 
-// RSC stream → HTML stream
-export async function handleSsr(rscStream: ReadableStream) {
-  const root = await createFromReadableStream(rscStream);
-  const bootstrapScriptContent = await bootstrapScriptContentPromise;
-  return renderToReadableStream(root, { bootstrapScriptContent });
+interface HandleSsrOptions {
+  signal?: AbortSignal;
 }
 
-// Hono handles API routes and anything not covered by RSC pages
-export function handleHono(request: Request): Response | Promise<Response> {
-  return app.fetch(request);
+// RSC stream → HTML stream
+export async function handleSsr(
+  rscStream: ReadableStream,
+  options: HandleSsrOptions = {}
+) {
+  const root = await createFromReadableStream(rscStream);
+  const bootstrapScriptContent = await bootstrapScriptContentPromise;
+  return renderToReadableStream(root, {
+    bootstrapScriptContent,
+    signal: options.signal,
+  });
 }
