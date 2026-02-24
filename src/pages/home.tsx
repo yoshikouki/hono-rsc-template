@@ -127,6 +127,28 @@ export function HomePage() {
           </p>
           <ServerTime />
         </section>
+        {/* ── Footer ──────────────────────────────────────────────────────── */}
+        <footer
+          style={{
+            marginTop: "3rem",
+            paddingTop: "1.5rem",
+            borderTop: "1px solid #eee",
+            color: "#999",
+            fontSize: "0.85rem",
+            textAlign: "center",
+          }}
+        >
+          <a
+            href="https://github.com/yoshikouki/hono-rsc-template"
+            rel="noopener noreferrer"
+            style={{ color: "#0070f3" }}
+            target="_blank"
+          >
+            yoshikouki/hono-rsc-template
+          </a>
+          {" — "}
+          React Server Components + Hono on Cloudflare Workers
+        </footer>
       </body>
     </html>
   );
