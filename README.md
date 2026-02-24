@@ -41,8 +41,8 @@ entry.rsc.tsx               entry.ssr.tsx           entry.browser.tsx
      │                            │                        │
      │  handler(request)          │                        │
      │  ┌─────────────────┐       │                        │
-     │  │ .rsc suffix?    │       │                        │
-     │  │ → rewrite to    │       │                        │
+     │  │ ?__rsc=1?       │       │                        │
+     │  │ → set header    │       │                        │
      │  │   X-RSC-Request │       │                        │
      │  └────────┬────────┘       │                        │
      │           │                │                        │
@@ -88,8 +88,8 @@ Browser → GET /
 **Hydration**
 
 ```
-Browser → GET /.rsc  (bootstrapScriptContent triggers this)
-  → entry.rsc.tsx:  .rsc suffix → strip → set X-RSC-Request: 1
+Browser → GET /?__rsc=1  (bootstrapScriptContent triggers this)
+  → entry.rsc.tsx:  ?__rsc=1 → set X-RSC-Request: 1 header
   → rscMiddleware:  isRsc=true
   → GET / handler:  renderPage(request, HomePageLoader)
   → renderPage:     return RSC stream directly
@@ -161,8 +161,10 @@ This repo's commit history shows the evolution:
 1. **`init: naive plugin-rsc + Hono fallback`** — The simplest working setup.  
    `pages` object in `entry.rsc.tsx`, Hono only for unmatched routes.
 
-2. **`refactor: integrate RSC as Hono middleware`** — Current design.  
-   Hono handles all routing. RSC rendering via `rscMiddleware` + `renderPage` context.
+2. **`refactor: integrate RSC as Hono middleware`** — Hono handles all routing. RSC rendering via `rscMiddleware` + `renderPage` context.
+
+3. **`refactor: switch from .rsc suffix to ?__rsc=1 search param`** — Current design.  
+   RSC requests use `?__rsc=1` query param. No URL rewriting needed; Hono routes the same path for both HTML and RSC.
 
 ## ⚠️ Scope: What This Template Does NOT Cover
 

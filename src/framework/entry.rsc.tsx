@@ -33,7 +33,11 @@ async function renderRscStream(loader: PageLoader): Promise<ReadableStream> {
 
 // RSC middleware — runs for every request, injects `renderPage` into context
 const rscMiddleware = createMiddleware<AppEnv>(async (c, next) => {
-  const isRsc = c.req.header(RSC_REQUEST_HEADER) === "1";
+  // Accept RSC requests via either the internal header (set below in handler)
+  // or the ?__rsc=1 search param as a fallback
+  const isRsc =
+    c.req.header(RSC_REQUEST_HEADER) === "1" ||
+    c.req.query("__rsc") === "1";
 
   c.set("renderPage", async (request: Request, loader: PageLoader) => {
     const rscStream = await renderRscStream(loader);
@@ -66,24 +70,25 @@ export default function handler(
   env: Env,
   ctx: ExecutionContext
 ): Response | Promise<Response> {
-  const url = new URL(request.url);
+  const sanitized = sanitizeRscHeader(request);
+  const url = new URL(sanitized.url);
 
-  // Convert .rsc suffix → X-RSC-Request: 1 header
-  // This lets Hono route /page and /page.rsc with the same handler
-  if (url.pathname.endsWith(".rsc")) {
-    const cleanPath = url.pathname.slice(0, -4) || "/";
-    const rewrittenUrl = new URL(cleanPath + url.search, url.origin);
-    const sanitized = sanitizeRscHeader(request);
+  // Convert ?__rsc=1 search param → X-RSC-Request: 1 header so that
+  // rscMiddleware (and any downstream code) can rely on a single canonical
+  // signal without having to parse query strings everywhere.
+  // The param is left in the URL so Hono routes the same path for both HTML
+  // and RSC requests without any URL rewriting.
+  if (url.searchParams.get("__rsc") === "1") {
     const headers = new Headers(sanitized.headers);
     headers.set(RSC_REQUEST_HEADER, "1");
     return app.fetch(
-      new Request(rewrittenUrl.toString(), { ...sanitized, headers }),
+      new Request(sanitized, { headers }),
       env,
       ctx
     );
   }
 
-  return app.fetch(sanitizeRscHeader(request), env, ctx);
+  return app.fetch(sanitized, env, ctx);
 }
 
 if (import.meta.hot) {

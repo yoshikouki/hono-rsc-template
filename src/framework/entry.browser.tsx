@@ -6,7 +6,7 @@ const TRAILING_SLASHES = /\/+$/;
 function rscUrl() {
   const pathname =
     window.location.pathname.replace(TRAILING_SLASHES, "") || "/";
-  return `${pathname}.rsc`;
+  return `${pathname}?__rsc=1`;
 }
 
 async function main() {
