@@ -59,10 +59,12 @@ const rscMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 const app = createApp(rscMiddleware);
 
 // Cloudflare Workers calls fetch(request, env, ctx)
-// env is passed to app.fetch so Hono makes it available as c.env
+// - env: bindings (KV, D1, R2...) → available as c.env in Hono routes
+// - ctx: ExecutionContext → available as c.executionCtx (e.g. ctx.waitUntil())
 export default function handler(
   request: Request,
-  env: Env
+  env: Env,
+  ctx: ExecutionContext
 ): Response | Promise<Response> {
   const url = new URL(request.url);
 
@@ -76,11 +78,12 @@ export default function handler(
     headers.set(RSC_REQUEST_HEADER, "1");
     return app.fetch(
       new Request(rewrittenUrl.toString(), { ...sanitized, headers }),
-      env
+      env,
+      ctx
     );
   }
 
-  return app.fetch(sanitizeRscHeader(request), env);
+  return app.fetch(sanitizeRscHeader(request), env, ctx);
 }
 
 if (import.meta.hot) {
