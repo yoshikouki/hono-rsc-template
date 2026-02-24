@@ -52,6 +52,14 @@ export function createApp(rscMiddleware: MiddlewareHandler<AppEnv>) {
     return c.json({ message: "Hello from Hono!", timestamp: Date.now() });
   });
 
+  // Reads GREETING from wrangler.toml [vars] via c.env
+  app.get("/api/env", (c) => {
+    return c.json({
+      greeting: c.env.GREETING,
+      note: "This value comes from wrangler.toml [vars] → c.env",
+    });
+  });
+
   app.get("/healthz", (c) => c.text("ok"));
 
   return app;

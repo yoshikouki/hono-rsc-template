@@ -3,6 +3,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [rsc()],
+  resolve: {
+    alias: {
+      "@": new URL("./src", import.meta.url).pathname,
+    },
+  },
   environments: {
     rsc: {
       build: {
