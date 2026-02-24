@@ -144,8 +144,7 @@ This template covers the basics — Server Components + Streaming SSR — but th
 |---|---|---|
 | **Server Actions** (`"use server"`) | ❌ Not supported | Waku, Next.js |
 | **Client Components** (`"use client"`) | ✅ Works automatically | — |
-| **Nested layouts** | ❌ Not supported | Waku, Next.js |
-| **File-based routing** | ❌ Manual registration | — |
+| **File-based routing + auto layout nesting** | ❌ Manual registration | Next.js, Waku |
 | **Cloudflare bindings** (KV, D1, R2) | ❌ `env` not threaded through | — |
 
 If you need Server Actions or a full RSC feature set, consider:
