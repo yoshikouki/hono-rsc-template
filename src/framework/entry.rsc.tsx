@@ -1,5 +1,6 @@
 import { renderToReadableStream } from "@vitejs/plugin-rsc/rsc";
 import { createMiddleware } from "hono/factory";
+import type { Env } from "@/bindings";
 import { type AppEnv, createApp, type PageLoader } from "@/index";
 
 const RSC_REQUEST_HEADER = "X-RSC-Request";
@@ -57,7 +58,12 @@ const rscMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 // Hono app handles ALL routes — RSC pages + API endpoints
 const app = createApp(rscMiddleware);
 
-export default function handler(request: Request): Response | Promise<Response> {
+// Cloudflare Workers calls fetch(request, env, ctx)
+// env is passed to app.fetch so Hono makes it available as c.env
+export default function handler(
+  request: Request,
+  env: Env
+): Response | Promise<Response> {
   const url = new URL(request.url);
 
   // Convert .rsc suffix → X-RSC-Request: 1 header
@@ -68,10 +74,13 @@ export default function handler(request: Request): Response | Promise<Response> 
     const sanitized = sanitizeRscHeader(request);
     const headers = new Headers(sanitized.headers);
     headers.set(RSC_REQUEST_HEADER, "1");
-    return app.fetch(new Request(rewrittenUrl.toString(), { ...sanitized, headers }));
+    return app.fetch(
+      new Request(rewrittenUrl.toString(), { ...sanitized, headers }),
+      env
+    );
   }
 
-  return app.fetch(sanitizeRscHeader(request));
+  return app.fetch(sanitizeRscHeader(request), env);
 }
 
 if (import.meta.hot) {

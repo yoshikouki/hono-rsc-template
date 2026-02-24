@@ -125,6 +125,35 @@ app.get("/my-page", (c) =>
 );
 ```
 
+## Using Cloudflare Bindings (KV, D1, R2)
+
+1. Declare the binding in `wrangler.toml`:
+
+```toml
+[[kv_namespaces]]
+binding = "MY_KV"
+id = "..."
+```
+
+2. Add the type in `src/bindings.ts`:
+
+```ts
+export interface Env {
+  MY_KV: KVNamespace;
+}
+```
+
+3. Use it in any Hono route via `c.env`:
+
+```ts
+app.get("/api/data", async (c) => {
+  const value = await c.env.MY_KV.get("my-key");
+  return c.json({ value });
+});
+```
+
+`env` is passed from the Workers runtime through `handler(request, env)` → `app.fetch(request, env)`, so all routes have full access.
+
 ## Commit History
 
 This repo's commit history shows the evolution:
@@ -145,7 +174,7 @@ This template covers the basics — Server Components + Streaming SSR — but th
 | **Server Actions** (`"use server"`) | ❌ Not supported | Waku, Next.js |
 | **Client Components** (`"use client"`) | ✅ Works automatically | — |
 | **File-based routing + auto layout nesting** | ❌ Manual registration | Next.js, Waku |
-| **Cloudflare bindings** (KV, D1, R2) | ❌ `env` not threaded through | — |
+| **Cloudflare bindings** (KV, D1, R2) | ✅ Available via `c.env` | — |
 
 If you need Server Actions or a full RSC feature set, consider:
 - **[Waku](https://waku.gg/)** — Minimal RSC framework with full feature support

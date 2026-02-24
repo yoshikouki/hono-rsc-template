@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { Hono } from "hono";
+import type { Env } from "@/bindings";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,6 +16,7 @@ export type RenderPage = (
 ) => Promise<Response>;
 
 export interface AppEnv {
+  Bindings: Env; // Cloudflare Workers bindings — access via c.env.MY_KV etc.
   Variables: {
     renderPage: RenderPage;
   };
@@ -26,6 +28,9 @@ export interface AppEnv {
 
 export function createApp(rscMiddleware: MiddlewareHandler<AppEnv>) {
   const app = new Hono<AppEnv>();
+
+  // Example: access bindings inside a route via c.env
+  // app.get("/api/kv", (c) => c.env.MY_KV.get("key"))
 
   // RSC middleware injects `renderPage` into context for all routes
   app.use("*", rscMiddleware);
