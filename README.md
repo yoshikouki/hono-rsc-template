@@ -98,6 +98,21 @@ Browser → GET /?__rsc=1  (bootstrapScriptContent triggers this)
 Browser: createFromReadableStream(body) → hydrateRoot(document, root)
 ```
 
+## Why `?__rsc=1` (Design Decision)
+
+RSC requires a way to distinguish "give me HTML" from "give me the RSC payload" for the same URL. Existing frameworks take different approaches:
+
+| Framework | Method | CDN Cache | Spoofing Risk |
+|---|---|---|---|
+| **Next.js** | `Rsc: 1` request header | Needs `Vary: Rsc` | [Documented risk](https://zhero-web-sec.github.io/research-and-things/nextjs-and-cache-poisoning-a-quest-for-the-black-hole) |
+| **Waku** | `/RSC/` path prefix | Separate URLs | None (different path) |
+| **This template** | `?__rsc=1` search param | Separate URLs | Header sanitized at entry |
+
+We chose `?__rsc=1` because:
+- **No URL rewriting** — Hono routes the same path for both HTML and RSC requests
+- **Natural CDN cache separation** — different URLs = different cache entries
+- **No spoofing** — external `X-RSC-Request` headers are stripped by `sanitizeRscHeader`; only the internal `?__rsc=1` → header conversion is trusted
+
 ## File Structure
 
 ```
@@ -105,7 +120,7 @@ src/
 ├── framework/
 │   ├── entry.rsc.tsx     # RSC env — rscMiddleware, handler, sanitizeRscHeader
 │   ├── entry.ssr.tsx     # SSR env — RSC stream → HTML
-│   └── entry.browser.tsx # Browser — .rsc fetch + hydrateRoot
+│   └── entry.browser.tsx # Browser — ?__rsc=1 fetch + hydrateRoot
 ├── pages/
 │   └── home.tsx          # Example Server Component
 └── index.tsx             # Hono app — createApp(), page routes, API routes
