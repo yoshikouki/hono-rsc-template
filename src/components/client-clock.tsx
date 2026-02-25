@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 
 export function ClientClock() {
-  const [time, setTime] = useState(() => new Date().toLocaleTimeString("ja-JP"));
+  const [time, setTime] = useState(() =>
+    new Date().toLocaleTimeString("ja-JP")
+  );
 
   useEffect(() => {
     const id = setInterval(

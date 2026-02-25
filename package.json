@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build && echo 'import handler from \"./rsc/index.js\"; export default { fetch: handler };' > dist/worker-entry.js",
     "preview": "wrangler dev --local --port 8787",
-    "deploy": "bun run build && wrangler deploy"
+    "deploy": "bun run build && wrangler deploy",
+    "check": "ultracite check",
+    "fix": "ultracite fix"
   },
   "dependencies": {
     "hono": "^4.9.0",
@@ -15,9 +17,11 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.0",
     "@cloudflare/workers-types": "^4.20250214.0",
     "@vitejs/plugin-rsc": "latest",
     "typescript": "^5.8.0",
+    "ultracite": "7.2.3",
     "vite": "^6.0.0",
     "wrangler": "^4.0.0"
   }

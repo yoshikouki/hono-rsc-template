@@ -19,6 +19,7 @@ export function ClickCounter() {
           color: count > 0 ? "#fff" : "#000",
           transition: "all 0.15s",
         }}
+        type="button"
       >
         Click me
       </button>

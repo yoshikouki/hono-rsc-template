@@ -1,6 +1,6 @@
 import { Suspense } from "react";
-import { ClientClock } from "@/components/client-clock";
 import { ClickCounter } from "@/components/click-counter";
+import { ClientClock } from "@/components/client-clock";
 
 // ─── Async Server Component (runs only on server, can await freely) ───────────
 
@@ -62,9 +62,15 @@ export function HomePage() {
         {/* ── 1. Client Component: live clock ─────────────────────────────── */}
         <section style={section}>
           <h2 style={h2}>⏰ Client Component — live clock</h2>
-          <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "0.75rem" }}>
-            <code>"use client"</code> + <code>useEffect</code> + <code>setInterval</code>.
-            Updates every second in the browser.
+          <p
+            style={{
+              color: "#666",
+              fontSize: "0.9rem",
+              marginBottom: "0.75rem",
+            }}
+          >
+            <code>"use client"</code> + <code>useEffect</code> +{" "}
+            <code>setInterval</code>. Updates every second in the browser.
           </p>
           <ClientClock />
         </section>
@@ -72,9 +78,15 @@ export function HomePage() {
         {/* ── 2. Client Component: click counter ──────────────────────────── */}
         <section style={section}>
           <h2 style={h2}>🖱️ Client Component — click counter</h2>
-          <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "0.75rem" }}>
-            <code>"use client"</code> + <code>useState</code>. Zero JS shipped for the
-            rest of this page.
+          <p
+            style={{
+              color: "#666",
+              fontSize: "0.9rem",
+              marginBottom: "0.75rem",
+            }}
+          >
+            <code>"use client"</code> + <code>useState</code>. Zero JS shipped
+            for the rest of this page.
           </p>
           <ClickCounter />
         </section>
@@ -82,9 +94,15 @@ export function HomePage() {
         {/* ── 3. Async Server Component + Suspense ────────────────────────── */}
         <section style={section}>
           <h2 style={h2}>⏳ Async Server Component + Suspense</h2>
-          <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "0.75rem" }}>
-            The server streams a fallback immediately, then replaces it when the slow
-            component resolves (~1.5s).
+          <p
+            style={{
+              color: "#666",
+              fontSize: "0.9rem",
+              marginBottom: "0.75rem",
+            }}
+          >
+            The server streams a fallback immediately, then replaces it when the
+            slow component resolves (~1.5s).
           </p>
           <Suspense
             fallback={
@@ -123,7 +141,8 @@ export function HomePage() {
         <section style={section}>
           <h2 style={h2}>🖥️ Server Component — rendered at request time</h2>
           <p style={{ color: "#666", fontSize: "0.9rem" }}>
-            No <code>"use client"</code> — this HTML was generated on the server.
+            No <code>"use client"</code> — this HTML was generated on the
+            server.
           </p>
           <ServerTime />
         </section>

@@ -12,7 +12,8 @@ export type PageLoader = () => Promise<{
 
 export type RenderPage = (
   request: Request,
-  loader: PageLoader
+  loader: PageLoader,
+  isRsc: boolean
 ) => Promise<Response>;
 
 export interface AppEnv {
@@ -32,19 +33,27 @@ export function createApp(rscMiddleware: MiddlewareHandler<AppEnv>) {
   // Example: access bindings inside a route via c.env
   // app.get("/api/kv", (c) => c.env.MY_KV.get("key"))
 
-  // RSC middleware injects `renderPage` into context for all routes
-  app.use("*", rscMiddleware);
-
   // --- Page routes ---
-  // Each route calls renderPage(request, loader) which:
-  //   - for .rsc requests: returns RSC stream (React Flight Protocol)
-  //   - for HTML requests: returns SSR-rendered HTML stream
-  app.get("/", (c) =>
-    c
-      .get("renderPage")(
-        c.req.raw,
-        () => import("@/pages/home").then((m) => ({ default: m.HomePage }))
-      )
+  // rscMiddleware is applied per-route to inject `renderPage` into context.
+  // Each route calls renderPage(request, loader, isRsc) which:
+  //   - isRsc=true:  returns RSC stream (React Flight Protocol)
+  //   - isRsc=false: returns SSR-rendered HTML stream
+  app.get("/", rscMiddleware, (c) =>
+    c.get("renderPage")(
+      c.req.raw,
+      () => import("@/routes/home").then((m) => ({ default: m.HomePage })),
+      false
+    )
+  );
+
+  // --- RSC payload routes ---
+  // /__rsc/* routes return raw RSC streams for client-side navigation/hydration
+  app.get("/__rsc/", rscMiddleware, (c) =>
+    c.get("renderPage")(
+      c.req.raw,
+      () => import("@/routes/home").then((m) => ({ default: m.HomePage })),
+      true
+    )
   );
 
   // --- API routes ---

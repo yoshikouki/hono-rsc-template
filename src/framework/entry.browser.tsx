@@ -1,17 +1,19 @@
 import { createFromReadableStream } from "@vitejs/plugin-rsc/browser";
 import { hydrateRoot } from "react-dom/client";
 
-const TRAILING_SLASHES = /\/+$/;
+const TRAILING_SLASHES = /\/\/+$/;
 
 function rscUrl() {
   const pathname =
     window.location.pathname.replace(TRAILING_SLASHES, "") || "/";
-  return `${pathname}?__rsc=1`;
+  return `/__rsc${pathname === "/" ? "/" : pathname}`;
 }
 
 async function main() {
   const rscResponse = await fetch(rscUrl());
-  if (!rscResponse.body) return;
+  if (!rscResponse.body) {
+    return;
+  }
   const root = await createFromReadableStream(rscResponse.body);
   hydrateRoot(document, root);
 }

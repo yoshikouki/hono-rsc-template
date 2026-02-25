@@ -40,31 +40,33 @@ This means all routing — pages and API — lives in one Hono app.
 entry.rsc.tsx               entry.ssr.tsx           entry.browser.tsx
      │                            │                        │
      │  handler(request)          │                        │
-     │  ┌─────────────────┐       │                        │
-     │  │ ?__rsc=1?       │       │                        │
-     │  │ → set header    │       │                        │
-     │  │   X-RSC-Request │       │                        │
-     │  └────────┬────────┘       │                        │
-     │           │                │                        │
+     │                            │                        │
      │    app.fetch(request)       │                        │
      │    (Hono with rscMiddleware)│                        │
      │           │                │                        │
      │   ┌───────▼────────┐       │                        │
-     │   │ rscMiddleware  │       │                        │
-     │   │ injects        │       │                        │
-     │   │ renderPage()   │       │                        │
-     │   └───────┬────────┘       │                        │
-     │           │                │                        │
-     │   ┌───────▼────────┐       │                        │
      │   │ GET /          │       │                        │
+     │   │ rscMiddleware  │       │                        │
      │   │ renderPage(    │       │                        │
      │   │   request,     │       │                        │
-     │   │   loader       │       │                        │
+     │   │   loader,      │       │                        │
+     │   │   isRsc=false  │       │                        │
      │   │ )              │       │                        │
      │   └───────┬────────┘       │                        │
      │           │ RSC stream     │                        │
      │           └────────────────► handleSsr()            │
      │                            │ → HTML stream          │
+     │                                                     │
+     │   ┌───────▼────────┐                               │
+     │   │ GET /__rsc/    │                               │
+     │   │ rscMiddleware  │                               │
+     │   │ renderPage(    │                               │
+     │   │   request,     │                               │
+     │   │   loader,      │                               │
+     │   │   isRsc=true   │                               │
+     │   │ )              │                               │
+     │   └───────┬────────┘                               │
+     │           │ RSC stream → Response                  │
      │                                                     │
      │   ┌───────────────────────────────────────────┐     │
      │   │ GET /api/hello → c.json({...})            │     │
@@ -77,28 +79,28 @@ entry.rsc.tsx               entry.ssr.tsx           entry.browser.tsx
 
 ```
 Browser → GET /
-  → entry.rsc.tsx:  sanitizeRscHeader, app.fetch()
-  → rscMiddleware:  isRsc=false, inject renderPage into context
-  → GET / handler:  renderPage(request, HomePageLoader)
+  → entry.rsc.tsx:  handler → app.fetch()
+  → rscMiddleware:  inject renderPage into context
+  → GET / handler:  renderPage(request, HomePageLoader, false)
   → renderPage:     renderToReadableStream(<HomePage />) → RSC stream
   → entry.ssr.tsx:  createFromReadableStream() + renderToReadableStream()
-  → Response:       Content-Type: text/html, Vary: X-RSC-Request
+  → Response:       Content-Type: text/html
 ```
 
 **Hydration**
 
 ```
-Browser → GET /?__rsc=1  (bootstrapScriptContent triggers this)
-  → entry.rsc.tsx:  ?__rsc=1 → set X-RSC-Request: 1 header
-  → rscMiddleware:  isRsc=true
-  → GET / handler:  renderPage(request, HomePageLoader)
+Browser → GET /__rsc/  (bootstrapScriptContent triggers this)
+  → entry.rsc.tsx:  handler → app.fetch()
+  → rscMiddleware:  inject renderPage into context
+  → GET /__rsc/ handler: renderPage(request, HomePageLoader, true)
   → renderPage:     return RSC stream directly
-  → Response:       Content-Type: text/x-component, Vary: X-RSC-Request
+  → Response:       Content-Type: text/x-component
 
 Browser: createFromReadableStream(body) → hydrateRoot(document, root)
 ```
 
-## Why `?__rsc=1` (Design Decision)
+## Why `/__rsc/` path prefix (Design Decision)
 
 RSC requires a way to distinguish "give me HTML" from "give me the RSC payload" for the same URL. Existing frameworks take different approaches:
 
@@ -106,36 +108,49 @@ RSC requires a way to distinguish "give me HTML" from "give me the RSC payload" 
 |---|---|---|---|
 | **Next.js** | `Rsc: 1` request header | Needs `Vary: Rsc` | [Documented risk](https://zhero-web-sec.github.io/research-and-things/nextjs-and-cache-poisoning-a-quest-for-the-black-hole) |
 | **Waku** | `/RSC/` path prefix | Separate URLs | None (different path) |
-| **This template** | `?__rsc=1` search param | Separate URLs | Header sanitized at entry |
+| **This template** | `/__rsc/` path prefix | Separate URLs | None (different path) |
 
-We chose `?__rsc=1` because:
-- **No URL rewriting** — Hono routes the same path for both HTML and RSC requests
-- **Natural CDN cache separation** — different URLs = different cache entries
-- **No spoofing** — external `X-RSC-Request` headers are stripped by `sanitizeRscHeader`; only the internal `?__rsc=1` → header conversion is trusted
+We chose the `/__rsc/` path prefix approach, inspired by [Waku](https://waku.gg/)'s use of `/RSC/`:
+
+- **No spoofing** — RSC and HTML are served from entirely different paths; no header stripping needed
+- **Natural CDN cache separation** — different URLs = different cache entries, no `Vary` header required
+- **Explicit routing** — `/__rsc/*` routes are registered explicitly in Hono, making the data flow easy to follow
+- **isRsc passed by caller** — route handlers decide `isRsc`, not middleware heuristics
 
 ## File Structure
 
 ```
 src/
 ├── framework/
-│   ├── entry.rsc.tsx     # RSC env — rscMiddleware, handler, sanitizeRscHeader
+│   ├── entry.rsc.tsx     # RSC env — rscMiddleware, handler
 │   ├── entry.ssr.tsx     # SSR env — RSC stream → HTML
-│   └── entry.browser.tsx # Browser — ?__rsc=1 fetch + hydrateRoot
-├── pages/
+│   └── entry.browser.tsx # Browser — /__rsc/ fetch + hydrateRoot
+├── routes/
 │   └── home.tsx          # Example Server Component
 └── index.tsx             # Hono app — createApp(), page routes, API routes
 ```
 
 ## Adding a Page
 
-1. Create `src/pages/my-page.tsx` and export a Server Component
-2. Register it in `src/index.tsx`:
+1. Create `src/routes/my-page.tsx` and export a Server Component
+2. Register both the HTML route and the RSC payload route in `src/index.tsx`:
 
 ```tsx
-app.get("/my-page", (c) =>
+// HTML route
+app.get("/my-page", rscMiddleware, (c) =>
   c.get("renderPage")(
     c.req.raw,
-    () => import("@/pages/my-page").then((m) => ({ default: m.MyPage }))
+    () => import("@/routes/my-page").then((m) => ({ default: m.MyPage })),
+    false
+  )
+);
+
+// RSC payload route
+app.get("/__rsc/my-page", rscMiddleware, (c) =>
+  c.get("renderPage")(
+    c.req.raw,
+    () => import("@/routes/my-page").then((m) => ({ default: m.MyPage })),
+    true
   )
 );
 ```
@@ -178,8 +193,8 @@ This repo's commit history shows the evolution:
 
 2. **`refactor: integrate RSC as Hono middleware`** — Hono handles all routing. RSC rendering via `rscMiddleware` + `renderPage` context.
 
-3. **`refactor: switch from .rsc suffix to ?__rsc=1 search param`** — Current design.  
-   RSC requests use `?__rsc=1` query param. No URL rewriting needed; Hono routes the same path for both HTML and RSC.
+3. **`refactor: switch from .rsc suffix to /__rsc/ path prefix`** — Current design.  
+   RSC requests use `/__rsc/` path prefix (inspired by Waku's `/RSC/`). Separate routes for HTML and RSC payloads; `isRsc` is passed explicitly by the route handler.
 
 ## ⚠️ Scope: What This Template Does NOT Cover
 
