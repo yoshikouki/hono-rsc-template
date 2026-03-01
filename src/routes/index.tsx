@@ -10,18 +10,18 @@ export const meta: RouteMeta = {
 export default function HomePage() {
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-4">Welcome</h1>
-      <p className="text-gray-600 mb-8">
+      <h1 className="mb-4 font-bold text-3xl">Welcome</h1>
+      <p className="mb-8 text-gray-600">
         This is a Hono + React Server Components template.
       </p>
 
       <section className="space-y-6">
         <div>
-          <h2 className="text-xl font-semibold mb-2">Client Clock</h2>
+          <h2 className="mb-2 font-semibold text-xl">Client Clock</h2>
           <ClientClock />
         </div>
         <div>
-          <h2 className="text-xl font-semibold mb-2">Click Counter</h2>
+          <h2 className="mb-2 font-semibold text-xl">Click Counter</h2>
           <ClickCounter />
         </div>
       </section>

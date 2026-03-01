@@ -1,8 +1,8 @@
 import type { Hono as HonoBase, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import type { AppEnv } from "../../factory";
-import { renderDocument } from "../../render-document";
 import type { SiteConfig } from "../../render-document";
+import { renderDocument } from "../../render-document";
 import { markdownResponse } from "../markdown/response";
 import type { ResolvedRoute } from "./resolver";
 import { handlerFileToPath, toMarkdownPath } from "./resolver";
@@ -59,7 +59,14 @@ export function createPageRouter(
   const app = new Hono<AppEnv>();
 
   for (const [path, resolved] of routeMap) {
-    registerPageHandler(app, pathPrefix + path, resolved, middleware, site, path);
+    registerPageHandler(
+      app,
+      pathPrefix + path,
+      resolved,
+      middleware,
+      site,
+      path
+    );
   }
 
   if (!pathPrefix) {

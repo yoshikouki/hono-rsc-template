@@ -1,13 +1,13 @@
 export interface RouteMeta {
-  title: string;
-  description?: string;
-  date?: string;
-  tags?: string[];
-  pathname?: string;
-  jsonLd?: unknown[];
-  ogImage?: string;
-  markdown?: () => string | Promise<string>;
   cacheControl?: string;
+  date?: string;
+  description?: string;
+  jsonLd?: unknown[];
+  markdown?: () => string | Promise<string>;
+  ogImage?: string;
+  pathname?: string;
+  tags?: string[];
+  title: string;
 }
 
 export interface RouteModule {
@@ -29,11 +29,11 @@ export type RenderPage = (
 ) => Promise<Response>;
 
 export interface RouteManifestEntry {
+  date?: string;
+  description?: string;
+  hasMarkdown: boolean;
   path: string;
   title: string;
-  description?: string;
-  date?: string;
-  hasMarkdown: boolean;
 }
 
 export interface AppEnv {
