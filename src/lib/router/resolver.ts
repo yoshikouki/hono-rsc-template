@@ -16,20 +16,20 @@ export interface LayoutEntry {
 }
 
 export interface ResolvedRoute {
-  page: import("../../factory").RouteLoader;
   layouts: LayoutEntry[];
+  page: import("../../factory").RouteLoader;
 }
 
 export interface RouteGlobs {
-  pages: Record<string, () => Promise<import("../../factory").RouteModule>>;
-  layouts: Record<string, () => Promise<import("../../factory").LayoutModule>>;
-  handlers: Record<string, import("hono").Hono>;
   contents: Record<string, string>;
+  handlers: Record<string, import("hono").Hono>;
+  layouts: Record<string, () => Promise<import("../../factory").LayoutModule>>;
+  pages: Record<string, () => Promise<import("../../factory").RouteModule>>;
 }
 
 export interface BuildRouteMapResult {
-  routeMap: Map<string, ResolvedRoute>;
   manifest: import("../../factory").RouteManifestEntry[];
+  routeMap: Map<string, ResolvedRoute>;
 }
 
 const RE_ROUTE_PREFIX = /^(?:\.\.?\/)*routes\//;

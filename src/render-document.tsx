@@ -2,30 +2,23 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export interface SiteConfig {
-  name: string;
   baseUrl: string;
   lang?: string; // default "en"
+  name: string;
 }
 
 export interface DocumentOptions {
-  title: string;
-  description?: string;
-  pathname: string;
   body: ReactNode;
+  description?: string;
   jsonLd?: unknown[];
   ogImage?: string;
+  pathname: string;
+  title: string;
 }
 
 export function renderDocument(
   site: SiteConfig,
-  {
-    title,
-    description,
-    pathname,
-    body,
-    jsonLd = [],
-    ogImage,
-  }: DocumentOptions
+  { title, description, pathname, body, jsonLd = [], ogImage }: DocumentOptions
 ) {
   const lang = site.lang ?? "en";
   const canonical = `${site.baseUrl}${pathname === "/" ? "/" : pathname}`;
@@ -53,7 +46,9 @@ export function renderDocument(
         {import.meta.viteRsc.loadCss()}
         {jsonLd.map((item, i) => (
           <script
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD requires inline script injection
             dangerouslySetInnerHTML={{ __html: JSON.stringify(item) }}
+            // biome-ignore lint/suspicious/noArrayIndexKey: JSON-LD items have no stable identifier
             key={i}
             type="application/ld+json"
           />

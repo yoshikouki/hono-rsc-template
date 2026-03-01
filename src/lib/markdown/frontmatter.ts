@@ -16,9 +16,9 @@ const stripWrappedQuotes = (value: string): string => {
 };
 
 export interface Frontmatter {
-  title: string;
-  description?: string;
   body: string;
+  description?: string;
+  title: string;
 }
 
 export function parseFrontmatter(raw: string): Frontmatter {

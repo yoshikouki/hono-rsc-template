@@ -31,7 +31,10 @@ export function createApp({
     return c.text("Internal Server Error", 500);
   });
 
-  app.route("/", createPageRouter(middlewares.rsc, resolvedRouteMap, site, "/__rsc"));
+  app.route(
+    "/",
+    createPageRouter(middlewares.rsc, resolvedRouteMap, site, "/__rsc")
+  );
   app.route("/", createPageRouter(middlewares.ssr, resolvedRouteMap, site));
   app.route("/", createHandlerRouter(globs.handlers));
 

@@ -122,12 +122,23 @@ We chose the `/__rsc/` path prefix approach, inspired by [Waku](https://waku.gg/
 ```
 src/
 ├── framework/
-│   ├── entry.rsc.tsx     # RSC env — rscMiddleware, handler
-│   ├── entry.ssr.tsx     # SSR env — RSC stream → HTML
-│   └── entry.browser.tsx # Browser — /__rsc/ fetch + hydrateRoot
+│   ├── entry.rsc.tsx       # RSC env — rscMiddleware, handler
+│   ├── entry.ssr.tsx       # SSR env — RSC stream → HTML
+│   └── entry.browser.tsx   # Browser — /__rsc/ fetch + hydrateRoot
+├── lib/
+│   ├── markdown/           # Markdown → React rendering (frontmatter, components)
+│   └── router/             # File-based route resolver & runtime
 ├── routes/
-│   └── home.tsx          # Example Server Component
-└── index.tsx             # Hono app — createApp(), page routes, API routes
+│   ├── about/              # /about page (index.tsx + layout.tsx)
+│   ├── index.tsx           # / (Home page)
+│   ├── layout.tsx          # Root layout
+│   ├── hello.md            # /hello (Markdown content page)
+│   ├── healthz.ts          # /healthz handler
+│   └── robots.txt.ts       # /robots.txt handler
+├── components/             # Client Components ("use client")
+├── render-document.tsx     # HTML document shell (<html>, <head>, <body>)
+├── factory.ts              # App types & factory helpers
+└── index.ts                # Hono app — createApp(), route registration
 ```
 
 ## Adding a Page
