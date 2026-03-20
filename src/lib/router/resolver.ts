@@ -3,6 +3,10 @@ import type { Frontmatter } from "@/lib/markdown/frontmatter";
 import { parseFrontmatter } from "@/lib/markdown/frontmatter";
 import { renderMarkdownToReact } from "@/lib/markdown/render";
 
+export interface BuildRouteMapOptions {
+  filterDrafts?: boolean;
+}
+
 export type {
   LayoutModule,
   RouteLoader,
@@ -99,8 +103,7 @@ export function createMarkdownRouteModule(
 ): import("../../factory").RouteModule {
   return {
     default: async () => {
-      const { body } = parseFrontmatter(raw);
-      const rendered = await renderMarkdownToReact(body);
+      const rendered = await renderMarkdownToReact(frontmatter.body);
       return createElement("article", null, rendered);
     },
     meta: {
@@ -114,7 +117,8 @@ export function createMarkdownRouteModule(
 }
 
 export function buildRouteMap(
-  globs: Pick<RouteGlobs, "pages" | "contents" | "layouts">
+  globs: Pick<RouteGlobs, "pages" | "contents" | "layouts">,
+  options?: BuildRouteMapOptions
 ): BuildRouteMapResult {
   const routeMap = new Map<string, ResolvedRoute>();
   const manifest: import("../../factory").RouteManifestEntry[] = [];
@@ -160,7 +164,7 @@ export function buildRouteMap(
     seen.set(path, file);
     const frontmatter = parseFrontmatter(raw);
 
-    if (frontmatter.draft && import.meta.env.PROD) {
+    if (frontmatter.draft && options?.filterDrafts) {
       continue;
     }
     const mod = createMarkdownRouteModule(raw, path, frontmatter);

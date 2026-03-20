@@ -199,17 +199,49 @@ describe("buildRouteMap", () => {
     expect(await getMarkdown?.()).toBe("# Hello");
   });
 
-  it("includes draft content in development mode", () => {
-    const { routeMap } = buildRouteMap({
-      pages: {},
-      layouts: {},
-      contents: {
-        "../routes/draft.md": "---\ntitle: Draft\ndraft: true\n---\nBody",
+  it("includes draft content when filterDrafts is false", () => {
+    const { routeMap } = buildRouteMap(
+      {
+        pages: {},
+        layouts: {},
+        contents: {
+          "../routes/draft.md": "---\ntitle: Draft\ndraft: true\n---\nBody",
+        },
       },
-    });
+      { filterDrafts: false }
+    );
 
-    // In test environment, import.meta.env.PROD is false, so drafts are included
     expect(routeMap.has("/draft")).toBe(true);
+  });
+
+  it("excludes draft content when filterDrafts is true", () => {
+    const { routeMap } = buildRouteMap(
+      {
+        pages: {},
+        layouts: {},
+        contents: {
+          "../routes/draft.md": "---\ntitle: Draft\ndraft: true\n---\nBody",
+        },
+      },
+      { filterDrafts: true }
+    );
+
+    expect(routeMap.has("/draft")).toBe(false);
+  });
+
+  it("includes non-draft content when filterDrafts is true", () => {
+    const { routeMap } = buildRouteMap(
+      {
+        pages: {},
+        layouts: {},
+        contents: {
+          "../routes/post.md": "---\ntitle: Post\n---\nBody",
+        },
+      },
+      { filterDrafts: true }
+    );
+
+    expect(routeMap.has("/post")).toBe(true);
   });
 
   it("records date from markdown frontmatter in manifest", () => {

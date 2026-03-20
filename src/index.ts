@@ -38,7 +38,7 @@ export function createApp({
     routeMap: resolvedRouteMap,
     manifest,
     markdownSources,
-  } = buildRouteMap(globs);
+  } = buildRouteMap(globs, { filterDrafts: import.meta.env.PROD });
 
   app.onError((err, c) => {
     console.error(err);
