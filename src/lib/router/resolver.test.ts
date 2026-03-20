@@ -131,7 +131,7 @@ describe("buildRouteMap", () => {
     });
 
     const getMarkdown = markdownSources.get("/hello");
-    expect(await getMarkdown!()).toBe(raw);
+    expect(await getMarkdown?.()).toBe(raw);
   });
 
   it("populates markdownSources for pages with markdown meta", async () => {
@@ -147,7 +147,7 @@ describe("buildRouteMap", () => {
 
     expect(markdownSources.has("/page")).toBe(true);
     const getMarkdown = markdownSources.get("/page");
-    expect(await getMarkdown!()).toBe("# Hello");
+    expect(await getMarkdown?.()).toBe("# Hello");
   });
 
   it("includes draft content in development mode", () => {

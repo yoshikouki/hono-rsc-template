@@ -20,6 +20,12 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     environment: "node",
+    coverage: {
+      enabled: true,
+      provider: "v8",
+      include: ["src/lib/**", "src/index.ts"],
+      reporter: ["text"],
+    },
   },
   environments: {
     rsc: {
