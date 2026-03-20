@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { LayoutModule, RouteModule } from "../../factory";
-import { buildRouteMap, resolveLayoutChain } from "./resolver";
+import {
+  buildRouteMap,
+  createMarkdownRouteModule,
+  resolveLayoutChain,
+} from "./resolver";
 
 const createPageModule = (title: string): RouteModule => ({
   default: () => null as unknown as React.ReactElement,
@@ -9,6 +13,51 @@ const createPageModule = (title: string): RouteModule => ({
 
 const layoutLoader = async (): Promise<LayoutModule> => ({
   default: ({ children }) => children as React.ReactElement,
+});
+
+describe("createMarkdownRouteModule", () => {
+  it("creates a module with correct meta from frontmatter", () => {
+    const frontmatter = {
+      title: "Post",
+      description: "Desc",
+      date: "2025-01-01",
+      body: "content",
+    };
+    const mod = createMarkdownRouteModule(
+      "---\ntitle: Post\n---\ncontent",
+      "/post",
+      frontmatter
+    );
+
+    expect(mod.meta?.title).toBe("Post");
+    expect(mod.meta?.description).toBe("Desc");
+    expect(mod.meta?.date).toBe("2025-01-01");
+    expect(mod.meta?.pathname).toBe("/post");
+  });
+
+  it("provides markdown accessor that returns raw content", async () => {
+    const raw = "---\ntitle: Post\n---\ncontent";
+    const frontmatter = { title: "Post", body: "content" };
+    const mod = createMarkdownRouteModule(raw, "/post", frontmatter);
+
+    expect(await mod.meta?.markdown?.()).toBe(raw);
+  });
+
+  it("falls back to path when title is empty", () => {
+    const frontmatter = { title: "", body: "content" };
+    const mod = createMarkdownRouteModule("content", "/untitled", frontmatter);
+
+    expect(mod.meta?.title).toBe("/untitled");
+  });
+
+  it("renders markdown body as article element", async () => {
+    const raw = "---\ntitle: Test\n---\n# Hello";
+    const frontmatter = { title: "Test", body: "# Hello" };
+    const mod = createMarkdownRouteModule(raw, "/test", frontmatter);
+
+    const element = await mod.default();
+    expect(element).toBeDefined();
+  });
 });
 
 describe("resolveLayoutChain", () => {

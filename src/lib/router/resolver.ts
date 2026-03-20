@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import type { Frontmatter } from "@/lib/markdown/frontmatter";
 import { parseFrontmatter } from "@/lib/markdown/frontmatter";
 import { renderMarkdownToReact } from "@/lib/markdown/render";
 
@@ -91,6 +92,27 @@ export function resolveLayoutChain(
   return chain;
 }
 
+export function createMarkdownRouteModule(
+  raw: string,
+  path: string,
+  frontmatter: Frontmatter
+): import("../../factory").RouteModule {
+  return {
+    default: async () => {
+      const { body } = parseFrontmatter(raw);
+      const rendered = await renderMarkdownToReact(body);
+      return createElement("article", null, rendered);
+    },
+    meta: {
+      title: frontmatter.title || path,
+      description: frontmatter.description,
+      date: frontmatter.date,
+      pathname: path,
+      markdown: () => raw,
+    },
+  };
+}
+
 export function buildRouteMap(
   globs: Pick<RouteGlobs, "pages" | "contents" | "layouts">
 ): BuildRouteMapResult {
@@ -141,21 +163,9 @@ export function buildRouteMap(
     if (frontmatter.draft && import.meta.env.PROD) {
       continue;
     }
+    const mod = createMarkdownRouteModule(raw, path, frontmatter);
     routeMap.set(path, {
-      page: () =>
-        Promise.resolve({
-          default: async () => {
-            const { body } = parseFrontmatter(raw);
-            const rendered = await renderMarkdownToReact(body);
-            return createElement("article", null, rendered);
-          },
-          meta: {
-            title: frontmatter.title || path,
-            description: frontmatter.description,
-            pathname: path,
-            markdown: () => raw,
-          },
-        }),
+      page: () => Promise.resolve(mod),
       layouts: resolveLayoutChain(path, globs.layouts),
     });
     manifest.push({
