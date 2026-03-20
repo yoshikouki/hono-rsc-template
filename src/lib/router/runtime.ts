@@ -86,6 +86,44 @@ export function createPageRouter(
   return app;
 }
 
+export function registerNotFoundHandler(
+  app: Hono<AppEnv>,
+  middleware: MiddlewareHandler<AppEnv>,
+  resolved: ResolvedRoute,
+  site: SiteConfig,
+) {
+  app.get("*", middleware, async (c) => {
+    const pageModule = await resolved.page();
+    const pageLoader = () =>
+      Promise.resolve({
+        default: async () => {
+          const layoutModules = await Promise.all(
+            resolved.layouts.map(({ loader }) => loader())
+          );
+          let body = await pageModule.default();
+
+          for (let i = layoutModules.length - 1; i >= 0; i -= 1) {
+            body = layoutModules[i].default({ children: body });
+          }
+
+          return renderDocument(site, {
+            title: pageModule.meta?.title ?? "Not Found",
+            description: pageModule.meta?.description,
+            pathname: new URL(c.req.url).pathname,
+            noindex: true,
+            body,
+          });
+        },
+      });
+
+    const response = await c.var.renderPage(c.req.raw, pageLoader);
+    return new Response(response.body, {
+      status: 404,
+      headers: response.headers,
+    });
+  });
+}
+
 export function createHandlerRouter(
   handlers: Record<string, HonoBase>
 ): Hono<AppEnv> {

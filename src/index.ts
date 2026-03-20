@@ -1,8 +1,16 @@
 import type { MiddlewareHandler } from "hono";
 import { Hono } from "hono";
-import type { AppEnv } from "./factory";
-import { buildRouteMap, type RouteGlobs } from "./lib/router/resolver";
-import { createHandlerRouter, createPageRouter } from "./lib/router/runtime";
+import type { AppEnv, RouteLoader } from "./factory";
+import {
+  buildRouteMap,
+  type RouteGlobs,
+  resolveLayoutChain,
+} from "./lib/router/resolver";
+import {
+  createHandlerRouter,
+  createPageRouter,
+  registerNotFoundHandler,
+} from "./lib/router/runtime";
 import type { SiteConfig } from "./render-document";
 
 export type { AppEnv, PageLoader, RenderPage } from "./factory";
@@ -18,9 +26,11 @@ export function createApp({
   middlewares,
   globs,
   site,
+  notFoundPage,
 }: {
   middlewares: Middlewares;
   globs: RouteGlobs;
+  notFoundPage?: RouteLoader;
   site: SiteConfig;
 }) {
   const app = new Hono<AppEnv>();
@@ -43,6 +53,14 @@ export function createApp({
   );
   app.route("/", createPageRouter(middlewares.ssr, resolvedRouteMap, site));
   app.route("/", createHandlerRouter(globs.handlers));
+
+  if (notFoundPage) {
+    const rootLayouts = resolveLayoutChain("/", globs.layouts);
+    registerNotFoundHandler(app, middlewares.ssr, {
+      page: notFoundPage,
+      layouts: rootLayouts,
+    }, site);
+  }
 
   return app;
 }

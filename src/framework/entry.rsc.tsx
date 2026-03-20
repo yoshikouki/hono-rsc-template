@@ -77,6 +77,11 @@ const app = createApp({
   middlewares: { rsc: rscMiddleware, ssr: ssrMiddleware },
   globs,
   site,
+  notFoundPage: () =>
+    import("../components/not-found").then((m) => ({
+      default: m.default,
+      meta: { title: "Not Found", noindex: true },
+    })),
 });
 
 export default function handler(
