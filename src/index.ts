@@ -15,7 +15,7 @@ import type { SiteConfig } from "./render-document";
 
 export type { AppEnv, PageLoader, RenderPage } from "./factory";
 export type { RouteGlobs } from "./lib/router/resolver";
-export type { SiteConfig } from "./render-document";
+export type { JsonLdContext, SiteConfig } from "./render-document";
 
 interface Middlewares {
   rsc: MiddlewareHandler<AppEnv>;

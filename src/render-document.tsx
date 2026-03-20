@@ -1,10 +1,18 @@
 import type { ReactNode } from "react";
 import "./globals.css";
 
+export interface JsonLdContext {
+  pathname: string;
+  title: string;
+  description?: string;
+  date?: string;
+}
+
 export interface SiteConfig {
   baseUrl: string;
   lang?: string; // default "en"
   name: string;
+  defaultJsonLd?: (context: JsonLdContext) => unknown[];
 }
 
 export interface DocumentOptions {

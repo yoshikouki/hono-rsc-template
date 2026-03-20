@@ -29,11 +29,20 @@ function registerPageHandler(
             body = layoutModules[i].default({ children: body });
           }
 
-          return renderDocument(site, {
+          const pageContext = {
+            pathname: routePath,
             title: pageModule.meta?.title ?? routePath,
             description: pageModule.meta?.description,
+            date: pageModule.meta?.date,
+          };
+          const defaultLd = site.defaultJsonLd?.(pageContext) ?? [];
+          const jsonLd = [...defaultLd, ...(pageModule.meta?.jsonLd ?? [])];
+
+          return renderDocument(site, {
+            title: pageContext.title,
+            description: pageContext.description,
             pathname: pageModule.meta?.pathname ?? routePath,
-            jsonLd: pageModule.meta?.jsonLd,
+            jsonLd,
             noindex: pageModule.meta?.noindex,
             ogImage: pageModule.meta?.ogImage,
             body,
@@ -106,10 +115,21 @@ export function registerNotFoundHandler(
             body = layoutModules[i].default({ children: body });
           }
 
-          return renderDocument(site, {
+          const notFoundPath = new URL(c.req.url).pathname;
+          const pageContext = {
+            pathname: notFoundPath,
             title: pageModule.meta?.title ?? "Not Found",
             description: pageModule.meta?.description,
-            pathname: new URL(c.req.url).pathname,
+            date: pageModule.meta?.date,
+          };
+          const defaultLd = site.defaultJsonLd?.(pageContext) ?? [];
+          const jsonLd = [...defaultLd, ...(pageModule.meta?.jsonLd ?? [])];
+
+          return renderDocument(site, {
+            title: pageContext.title,
+            description: pageContext.description,
+            pathname: notFoundPath,
+            jsonLd,
             noindex: true,
             body,
           });
