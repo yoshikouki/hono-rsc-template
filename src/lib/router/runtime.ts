@@ -71,13 +71,13 @@ export function createPageRouter(
 
   if (!pathPrefix) {
     // .md auto-generation handlers (SSR only)
-    for (const [path, resolved] of routeMap) {
-      app.get(toMarkdownPath(path), async () => {
-        const mod = await resolved.page();
-        if (!mod.meta?.markdown) {
+    for (const [path] of routeMap) {
+      app.get(toMarkdownPath(path), async (c) => {
+        const getMarkdown = c.var.markdownSources.get(path);
+        if (!getMarkdown) {
           return new Response("Not Found", { status: 404 });
         }
-        return markdownResponse(await mod.meta.markdown());
+        return markdownResponse(await getMarkdown());
       });
     }
   }
