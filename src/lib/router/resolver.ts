@@ -136,6 +136,10 @@ export function buildRouteMap(
 
     seen.set(path, file);
     const frontmatter = parseFrontmatter(raw);
+
+    if (frontmatter.draft && import.meta.env.PROD) {
+      continue;
+    }
     routeMap.set(path, {
       page: () =>
         Promise.resolve({

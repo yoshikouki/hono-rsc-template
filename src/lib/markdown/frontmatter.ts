@@ -17,7 +17,9 @@ const stripWrappedQuotes = (value: string): string => {
 
 export interface Frontmatter {
   body: string;
+  date?: string;
   description?: string;
+  draft?: boolean;
   title: string;
 }
 
@@ -38,6 +40,8 @@ export function parseFrontmatter(raw: string): Frontmatter {
   return {
     title: meta.title || "",
     description: meta.description,
+    date: meta.date,
+    draft: meta.draft === "true",
     body: match[2],
   };
 }
