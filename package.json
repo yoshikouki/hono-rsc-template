@@ -26,12 +26,12 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250214.0",
-    "@vitejs/plugin-react": "^4.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
     "@vitejs/plugin-rsc": "latest",
     "babel-plugin-react-compiler": "^1.0.0",
     "typescript": "^5.8.0",
     "ultracite": "7.2.3",
-    "vite": "^6.0.0",
+    "vite": "^8.0.0",
     "vitest": "^3.0.0",
     "wrangler": "^4.0.0"
   }
