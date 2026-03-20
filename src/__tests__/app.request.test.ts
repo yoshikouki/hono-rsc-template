@@ -130,19 +130,19 @@ describe("app request specs", () => {
     );
   });
 
-  // defaultJsonLd composition
-  it("composes defaultJsonLd with page jsonLd", async () => {
-    const defaultItem = { "@type": "WebSite", name: "Test" };
-    const siteWithJsonLd = {
-      ...site,
-      defaultJsonLd: () => [defaultItem],
-    };
+  // defaultJsonLd wiring
+  it("invokes defaultJsonLd callback with page context during request", async () => {
+    const spy = vi.fn(() => [{ "@type": "WebSite" }]);
     const jsonLdApp = createApp({
-      site: siteWithJsonLd,
+      site: { ...site, defaultJsonLd: spy },
       middlewares: { rsc: stubMiddleware, ssr: stubMiddleware },
       globs: testGlobs,
     });
-    const res = await jsonLdApp.request("/");
-    expect(res.status).toBe(200);
+
+    await jsonLdApp.request("/");
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: "/", title: expect.any(String) })
+    );
   });
 });
