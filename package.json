@@ -12,8 +12,8 @@
     "fix": "ultracite fix"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.2.1",
-    "hono": "^4.9.0",
+    "@tailwindcss/vite": "^4.2.2",
+    "hono": "^4.12.8",
     "react": "^19.0.0",
     "react-compiler-runtime": "^1.0.0",
     "react-dom": "^19.0.0",
@@ -21,18 +21,18 @@
     "remark-gfm": "^4.0.0",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.0.0",
-    "tailwindcss": "^4.2.1",
+    "tailwindcss": "^4.2.2",
     "unified": "^11.0.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250214.0",
+    "@cloudflare/workers-types": "^4.20260317.1",
     "@vitejs/plugin-react": "^6.0.0",
-    "@vitejs/plugin-rsc": "latest",
+    "@vitejs/plugin-rsc": "^0.5.21",
     "babel-plugin-react-compiler": "^1.0.0",
     "typescript": "^5.8.0",
     "ultracite": "7.2.3",
     "vite": "^8.0.0",
     "vitest": "^3.0.0",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.75.0"
   }
 }
