@@ -15,6 +15,7 @@ export const markdownResponse = (
 ): Response => {
   const headers = new Headers({
     "Cache-Control": MARKDOWN_CACHE_CONTROL,
+    "Content-Signal": "search=yes ai-input=yes",
     "Content-Type": "text/markdown; charset=utf-8",
     "X-Markdown-Tokens": estimateTokens(content),
   });
