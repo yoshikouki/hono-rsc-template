@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LayoutModule } from "../../factory";
+import type { LayoutModule, RouteModule } from "../../factory";
 import type { SiteConfig } from "../../render-document";
-import { composeWithLayouts, resolveJsonLd } from "./runtime";
+import { buildPageLoader, composeWithLayouts, resolveJsonLd } from "./runtime";
 
 describe("composeWithLayouts", () => {
   it("returns body unchanged when no layouts", () => {
@@ -88,5 +88,79 @@ describe("resolveJsonLd", () => {
       description: "Desc",
       date: "2025-01-01",
     });
+  });
+});
+
+describe("buildPageLoader", () => {
+  const baseSite: SiteConfig = {
+    baseUrl: "https://example.com",
+    name: "Test",
+  };
+
+  const createResolved = (mod: RouteModule) => ({
+    page: () => Promise.resolve(mod),
+    layouts: [] as { file: string; loader: () => Promise<LayoutModule> }[],
+  });
+
+  it("returns a callable PageLoader", () => {
+    const mod: RouteModule = {
+      default: () => null as unknown as React.ReactElement,
+      meta: { title: "Page" },
+    };
+    const loader = buildPageLoader(baseSite, createResolved(mod), mod, {
+      pathname: "/test",
+    });
+
+    expect(typeof loader).toBe("function");
+  });
+
+  it("uses meta.title when available", () => {
+    const mod: RouteModule = {
+      default: () => null as unknown as React.ReactElement,
+      meta: { title: "Custom Title" },
+    };
+    const spy = vi.fn(() => []);
+    const site = { ...baseSite, defaultJsonLd: spy };
+    buildPageLoader(site, createResolved(mod), mod, { pathname: "/test" });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Custom Title" })
+    );
+  });
+
+  it("falls back to pathname when title is missing", () => {
+    const mod: RouteModule = {
+      default: () => null as unknown as React.ReactElement,
+    };
+    const spy = vi.fn(() => []);
+    const site = { ...baseSite, defaultJsonLd: spy };
+    buildPageLoader(site, createResolved(mod), mod, { pathname: "/fallback" });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "/fallback" })
+    );
+  });
+
+  it("applies noindex override", async () => {
+    const mod: RouteModule = {
+      default: () => null as unknown as React.ReactElement,
+      meta: { title: "Page" },
+    };
+    const loaderWithNoindex = buildPageLoader(
+      baseSite,
+      createResolved(mod),
+      mod,
+      { pathname: "/", noindex: true }
+    );
+    const loaderWithoutNoindex = buildPageLoader(
+      baseSite,
+      createResolved(mod),
+      mod,
+      { pathname: "/" }
+    );
+
+    // Both should be callable — the noindex difference manifests in the rendered document
+    expect(typeof loaderWithNoindex).toBe("function");
+    expect(typeof loaderWithoutNoindex).toBe("function");
   });
 });

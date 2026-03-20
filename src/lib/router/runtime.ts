@@ -1,6 +1,6 @@
 import type { Hono as HonoBase, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
-import type { AppEnv, LayoutModule } from "../../factory";
+import type { AppEnv, LayoutModule, PageLoader, RouteModule } from "../../factory";
 import type { SiteConfig } from "../../render-document";
 import { renderDocument } from "../../render-document";
 import { markdownResponse } from "../markdown/response";
@@ -38,6 +38,48 @@ export function resolveJsonLd(
   return [...defaultLd, ...(meta.jsonLd ?? [])];
 }
 
+export function buildPageLoader(
+  site: SiteConfig,
+  resolved: ResolvedRoute,
+  pageModule: RouteModule,
+  options: { pathname: string; noindex?: boolean }
+): PageLoader {
+  const title = pageModule.meta?.title ?? options.pathname;
+  const jsonLd = resolveJsonLd(
+    site,
+    {
+      title,
+      description: pageModule.meta?.description,
+      date: pageModule.meta?.date,
+      jsonLd: pageModule.meta?.jsonLd,
+    },
+    options.pathname
+  );
+
+  return () =>
+    Promise.resolve({
+      default: async () => {
+        const layoutModules = await Promise.all(
+          resolved.layouts.map(({ loader }) => loader())
+        );
+        const body = composeWithLayouts(
+          await pageModule.default(),
+          layoutModules
+        );
+
+        return renderDocument(site, {
+          title,
+          description: pageModule.meta?.description,
+          pathname: pageModule.meta?.pathname ?? options.pathname,
+          jsonLd,
+          noindex: options.noindex ?? pageModule.meta?.noindex,
+          ogImage: pageModule.meta?.ogImage,
+          body,
+        });
+      },
+    });
+}
+
 function registerPageHandler(
   app: Hono<AppEnv>,
   path: string,
@@ -48,40 +90,9 @@ function registerPageHandler(
 ) {
   app.get(path, middleware, async (c) => {
     const pageModule = await resolved.page();
-    const title = pageModule.meta?.title ?? routePath;
-    const jsonLd = resolveJsonLd(
-      site,
-      {
-        title,
-        description: pageModule.meta?.description,
-        date: pageModule.meta?.date,
-        jsonLd: pageModule.meta?.jsonLd,
-      },
-      routePath
-    );
-
-    const pageLoader = () =>
-      Promise.resolve({
-        default: async () => {
-          const layoutModules = await Promise.all(
-            resolved.layouts.map(({ loader }) => loader())
-          );
-          const body = composeWithLayouts(
-            await pageModule.default(),
-            layoutModules
-          );
-
-          return renderDocument(site, {
-            title,
-            description: pageModule.meta?.description,
-            pathname: pageModule.meta?.pathname ?? routePath,
-            jsonLd,
-            noindex: pageModule.meta?.noindex,
-            ogImage: pageModule.meta?.ogImage,
-            body,
-          });
-        },
-      });
+    const pageLoader = buildPageLoader(site, resolved, pageModule, {
+      pathname: routePath,
+    });
 
     const response = await c.var.renderPage(c.req.raw, pageLoader);
 
@@ -136,40 +147,10 @@ export function registerNotFoundHandler(
 ) {
   app.get("*", middleware, async (c) => {
     const pageModule = await resolved.page();
-    const notFoundPath = new URL(c.req.url).pathname;
-    const title = pageModule.meta?.title ?? "Not Found";
-    const jsonLd = resolveJsonLd(
-      site,
-      {
-        title,
-        description: pageModule.meta?.description,
-        date: pageModule.meta?.date,
-        jsonLd: pageModule.meta?.jsonLd,
-      },
-      notFoundPath
-    );
-
-    const pageLoader = () =>
-      Promise.resolve({
-        default: async () => {
-          const layoutModules = await Promise.all(
-            resolved.layouts.map(({ loader }) => loader())
-          );
-          const body = composeWithLayouts(
-            await pageModule.default(),
-            layoutModules
-          );
-
-          return renderDocument(site, {
-            title,
-            description: pageModule.meta?.description,
-            pathname: notFoundPath,
-            jsonLd,
-            noindex: true,
-            body,
-          });
-        },
-      });
+    const pageLoader = buildPageLoader(site, resolved, pageModule, {
+      pathname: new URL(c.req.url).pathname,
+      noindex: true,
+    });
 
     const response = await c.var.renderPage(c.req.raw, pageLoader);
     return new Response(response.body, {
