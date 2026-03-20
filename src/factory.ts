@@ -40,5 +40,6 @@ export interface AppEnv {
   Variables: {
     markdownSources: Map<string, () => Promise<string>>;
     renderPage: RenderPage;
+    routeManifest: RouteManifestEntry[];
   };
 }

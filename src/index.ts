@@ -34,8 +34,11 @@ export function createApp({
   site: SiteConfig;
 }) {
   const app = new Hono<AppEnv>();
-  const { routeMap: resolvedRouteMap, markdownSources } =
-    buildRouteMap(globs);
+  const {
+    routeMap: resolvedRouteMap,
+    manifest,
+    markdownSources,
+  } = buildRouteMap(globs);
 
   app.onError((err, c) => {
     console.error(err);
@@ -44,6 +47,7 @@ export function createApp({
 
   app.use("*", async (c, next) => {
     c.set("markdownSources", markdownSources);
+    c.set("routeManifest", manifest);
     await next();
   });
 
