@@ -63,10 +63,15 @@ export function createApp({
 
   if (notFoundPage) {
     const rootLayouts = resolveLayoutChain("/", globs.layouts);
-    registerNotFoundHandler(app, middlewares.ssr, {
-      page: notFoundPage,
-      layouts: rootLayouts,
-    }, site);
+    registerNotFoundHandler(
+      app,
+      middlewares.ssr,
+      {
+        page: notFoundPage,
+        layouts: rootLayouts,
+      },
+      site
+    );
   }
 
   return app;

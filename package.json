@@ -25,6 +25,7 @@
     "unified": "^11.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.7",
     "@cloudflare/workers-types": "^4.20260317.1",
     "@vitejs/plugin-react": "^6.0.0",
     "@vitejs/plugin-rsc": "^0.5.21",

@@ -99,7 +99,7 @@ export function registerNotFoundHandler(
   app: Hono<AppEnv>,
   middleware: MiddlewareHandler<AppEnv>,
   resolved: ResolvedRoute,
-  site: SiteConfig,
+  site: SiteConfig
 ) {
   app.get("*", middleware, async (c) => {
     const pageModule = await resolved.page();

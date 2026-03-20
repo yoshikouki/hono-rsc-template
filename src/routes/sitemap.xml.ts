@@ -11,7 +11,7 @@ app.get("/", (c) => {
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     ...manifest.map(
       (entry) =>
-        `  <url><loc>${baseUrl}${entry.path}</loc>${entry.date ? `<lastmod>${entry.date}</lastmod>` : ""}</url>`,
+        `  <url><loc>${baseUrl}${entry.path}</loc>${entry.date ? `<lastmod>${entry.date}</lastmod>` : ""}</url>`
     ),
     "</urlset>",
   ].join("\n");

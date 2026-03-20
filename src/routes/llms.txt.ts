@@ -6,7 +6,7 @@ const app = new Hono<AppEnv>();
 app.get("/", (c) => {
   const manifest = c.var.routeManifest;
   const lines = manifest.map(
-    (entry) => `- [${entry.title}](${entry.path}): ${entry.description || ""}`,
+    (entry) => `- [${entry.title}](${entry.path}): ${entry.description || ""}`
   );
   const body = ["# Site Pages", "", ...lines].join("\n");
 
