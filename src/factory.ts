@@ -4,6 +4,7 @@ export interface RouteMeta {
   description?: string;
   jsonLd?: unknown[];
   markdown?: () => string | Promise<string>;
+  noindex?: boolean;
   ogImage?: string;
   pathname?: string;
   tags?: string[];

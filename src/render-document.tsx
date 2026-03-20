@@ -11,6 +11,7 @@ export interface DocumentOptions {
   body: ReactNode;
   description?: string;
   jsonLd?: unknown[];
+  noindex?: boolean;
   ogImage?: string;
   pathname: string;
   title: string;
@@ -18,7 +19,15 @@ export interface DocumentOptions {
 
 export function renderDocument(
   site: SiteConfig,
-  { title, description, pathname, body, jsonLd = [], ogImage }: DocumentOptions
+  {
+    title,
+    description,
+    pathname,
+    body,
+    jsonLd = [],
+    noindex,
+    ogImage,
+  }: DocumentOptions
 ) {
   const lang = site.lang ?? "en";
   const canonical = `${site.baseUrl}${pathname === "/" ? "/" : pathname}`;
@@ -29,6 +38,7 @@ export function renderDocument(
         <meta charSet="utf-8" />
         <meta content="width=device-width, initial-scale=1" name="viewport" />
         <title>{title}</title>
+        {noindex ? <meta content="noindex,nofollow" name="robots" /> : null}
         {description ? <meta content={description} name="description" /> : null}
         <link href={canonical} rel="canonical" />
 

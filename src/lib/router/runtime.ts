@@ -34,6 +34,7 @@ function registerPageHandler(
             description: pageModule.meta?.description,
             pathname: pageModule.meta?.pathname ?? routePath,
             jsonLd: pageModule.meta?.jsonLd,
+            noindex: pageModule.meta?.noindex,
             ogImage: pageModule.meta?.ogImage,
             body,
           });
