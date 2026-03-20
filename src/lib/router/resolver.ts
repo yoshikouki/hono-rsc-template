@@ -73,7 +73,7 @@ export function resolveLayoutChain(
   const segments = path.split("/").filter(Boolean);
   const directories = [""];
 
-  for (let i = 0; i < segments.length - 1; i += 1) {
+  for (let i = 0; i < segments.length; i += 1) {
     directories.push(segments.slice(0, i + 1).join("/"));
   }
 
