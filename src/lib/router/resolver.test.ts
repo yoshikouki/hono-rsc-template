@@ -22,6 +22,7 @@ describe("resolveLayoutChain", () => {
     expect(chain.map((layout) => layout.file)).toEqual([
       "../routes/layout.tsx",
       "../routes/about/layout.tsx",
+      "../routes/about/career/layout.tsx",
     ]);
   });
 
