@@ -1,7 +1,7 @@
 import { createFromReadableStream } from "@vitejs/plugin-rsc/browser";
 import { hydrateRoot } from "react-dom/client";
 
-const TRAILING_SLASHES = /\/\/+$/;
+const TRAILING_SLASHES = /\/+$/;
 
 function rscUrl() {
   const pathname =
