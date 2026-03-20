@@ -1,11 +1,42 @@
 import type { Hono as HonoBase, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
-import type { AppEnv } from "../../factory";
+import type { AppEnv, LayoutModule } from "../../factory";
 import type { SiteConfig } from "../../render-document";
 import { renderDocument } from "../../render-document";
 import { markdownResponse } from "../markdown/response";
 import type { ResolvedRoute } from "./resolver";
 import { handlerFileToPath, toMarkdownPath } from "./resolver";
+
+export function composeWithLayouts(
+  body: React.ReactElement,
+  layoutModules: LayoutModule[]
+): React.ReactElement {
+  let composed = body;
+  for (let i = layoutModules.length - 1; i >= 0; i -= 1) {
+    composed = layoutModules[i].default({ children: composed });
+  }
+  return composed;
+}
+
+export function resolveJsonLd(
+  site: SiteConfig,
+  meta: {
+    title: string;
+    description?: string;
+    date?: string;
+    jsonLd?: unknown[];
+  },
+  pathname: string
+): unknown[] {
+  const context = {
+    pathname,
+    title: meta.title,
+    description: meta.description,
+    date: meta.date,
+  };
+  const defaultLd = site.defaultJsonLd?.(context) ?? [];
+  return [...defaultLd, ...(meta.jsonLd ?? [])];
+}
 
 function registerPageHandler(
   app: Hono<AppEnv>,
@@ -17,30 +48,32 @@ function registerPageHandler(
 ) {
   app.get(path, middleware, async (c) => {
     const pageModule = await resolved.page();
+    const title = pageModule.meta?.title ?? routePath;
+    const jsonLd = resolveJsonLd(
+      site,
+      {
+        title,
+        description: pageModule.meta?.description,
+        date: pageModule.meta?.date,
+        jsonLd: pageModule.meta?.jsonLd,
+      },
+      routePath
+    );
+
     const pageLoader = () =>
       Promise.resolve({
         default: async () => {
           const layoutModules = await Promise.all(
             resolved.layouts.map(({ loader }) => loader())
           );
-          let body = await pageModule.default();
-
-          for (let i = layoutModules.length - 1; i >= 0; i -= 1) {
-            body = layoutModules[i].default({ children: body });
-          }
-
-          const pageContext = {
-            pathname: routePath,
-            title: pageModule.meta?.title ?? routePath,
-            description: pageModule.meta?.description,
-            date: pageModule.meta?.date,
-          };
-          const defaultLd = site.defaultJsonLd?.(pageContext) ?? [];
-          const jsonLd = [...defaultLd, ...(pageModule.meta?.jsonLd ?? [])];
+          const body = composeWithLayouts(
+            await pageModule.default(),
+            layoutModules
+          );
 
           return renderDocument(site, {
-            title: pageContext.title,
-            description: pageContext.description,
+            title,
+            description: pageModule.meta?.description,
             pathname: pageModule.meta?.pathname ?? routePath,
             jsonLd,
             noindex: pageModule.meta?.noindex,
@@ -103,31 +136,33 @@ export function registerNotFoundHandler(
 ) {
   app.get("*", middleware, async (c) => {
     const pageModule = await resolved.page();
+    const notFoundPath = new URL(c.req.url).pathname;
+    const title = pageModule.meta?.title ?? "Not Found";
+    const jsonLd = resolveJsonLd(
+      site,
+      {
+        title,
+        description: pageModule.meta?.description,
+        date: pageModule.meta?.date,
+        jsonLd: pageModule.meta?.jsonLd,
+      },
+      notFoundPath
+    );
+
     const pageLoader = () =>
       Promise.resolve({
         default: async () => {
           const layoutModules = await Promise.all(
             resolved.layouts.map(({ loader }) => loader())
           );
-          let body = await pageModule.default();
-
-          for (let i = layoutModules.length - 1; i >= 0; i -= 1) {
-            body = layoutModules[i].default({ children: body });
-          }
-
-          const notFoundPath = new URL(c.req.url).pathname;
-          const pageContext = {
-            pathname: notFoundPath,
-            title: pageModule.meta?.title ?? "Not Found",
-            description: pageModule.meta?.description,
-            date: pageModule.meta?.date,
-          };
-          const defaultLd = site.defaultJsonLd?.(pageContext) ?? [];
-          const jsonLd = [...defaultLd, ...(pageModule.meta?.jsonLd ?? [])];
+          const body = composeWithLayouts(
+            await pageModule.default(),
+            layoutModules
+          );
 
           return renderDocument(site, {
-            title: pageContext.title,
-            description: pageContext.description,
+            title,
+            description: pageModule.meta?.description,
             pathname: notFoundPath,
             jsonLd,
             noindex: true,
