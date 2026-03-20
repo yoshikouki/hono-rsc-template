@@ -49,6 +49,9 @@ export function createApp({
     c.set("markdownSources", markdownSources);
     c.set("routeManifest", manifest);
     await next();
+    if (c.res.headers.get("Content-Type")?.includes("text/html")) {
+      c.res.headers.set("Speculation-Rules", '"/speculationrules.json"');
+    }
   });
 
   app.route(
