@@ -24,7 +24,7 @@ export interface RouteGlobs {
   contents: Record<string, string>;
   handlers: Record<string, import("hono").Hono>;
   layouts: Record<string, () => Promise<import("../../factory").LayoutModule>>;
-  pages: Record<string, () => Promise<import("../../factory").RouteModule>>;
+  pages: Record<string, import("../../factory").RouteModule>;
 }
 
 export interface BuildRouteMapResult {
@@ -97,7 +97,7 @@ export function buildRouteMap(
   const manifest: import("../../factory").RouteManifestEntry[] = [];
   const seen = new Map<string, string>();
 
-  for (const [file, loader] of Object.entries(globs.pages)) {
+  for (const [file, mod] of Object.entries(globs.pages)) {
     if (RE_LAYOUT_TSX_FILE.test(file)) {
       continue;
     }
@@ -111,10 +111,15 @@ export function buildRouteMap(
 
     seen.set(path, file);
     routeMap.set(path, {
-      page: loader,
+      page: () => Promise.resolve(mod),
       layouts: resolveLayoutChain(path, globs.layouts),
     });
-    manifest.push({ path, title: path, hasMarkdown: false });
+    manifest.push({
+      path,
+      title: mod.meta?.title ?? path,
+      description: mod.meta?.description,
+      hasMarkdown: false,
+    });
   }
 
   for (const [file, raw] of Object.entries(globs.contents)) {

@@ -54,7 +54,7 @@ const ssrMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 });
 
 const globs: RouteGlobs = {
-  pages: import.meta.glob<RouteModule>("../routes/**/*.tsx"),
+  pages: import.meta.glob<RouteModule>("../routes/**/*.tsx", { eager: true }),
   layouts: import.meta.glob<LayoutModule>("../routes/**/layout.tsx"),
   handlers: import.meta.glob("../routes/**/*.ts", {
     eager: true,

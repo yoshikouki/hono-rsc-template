@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LayoutModule, RouteModule } from "../../factory";
 import { buildRouteMap, resolveLayoutChain } from "./resolver";
 
-const createPageLoader = (title: string) => async (): Promise<RouteModule> => ({
+const createPageModule = (title: string): RouteModule => ({
   default: () => null as unknown as React.ReactElement,
   meta: { title },
 });
@@ -40,7 +40,7 @@ describe("buildRouteMap", () => {
   it("stores resolved layout chain with each page route", () => {
     const { routeMap } = buildRouteMap({
       pages: {
-        "../routes/about/career.tsx": createPageLoader("Career"),
+        "../routes/about/career.tsx": createPageModule("Career"),
       },
       layouts: {
         "../routes/layout.tsx": layoutLoader,
@@ -60,7 +60,7 @@ describe("buildRouteMap", () => {
   it("maps index.tsx to /", () => {
     const { routeMap } = buildRouteMap({
       pages: {
-        "../routes/index.tsx": createPageLoader("Home"),
+        "../routes/index.tsx": createPageModule("Home"),
       },
       layouts: {},
       contents: {},
