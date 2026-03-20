@@ -20,6 +20,7 @@ export interface Frontmatter {
   date?: string;
   description?: string;
   draft?: boolean;
+  tags?: string[];
   title: string;
 }
 
@@ -37,11 +38,19 @@ export function parseFrontmatter(raw: string): Frontmatter {
     }
   }
 
+  const tags = meta.tags
+    ? meta.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : undefined;
+
   return {
     title: meta.title || "",
     description: meta.description,
     date: meta.date,
-    draft: meta.draft === "true",
+    draft: meta.draft === "true" ? true : undefined,
+    tags,
     body: match[2],
   };
 }
