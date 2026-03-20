@@ -42,4 +42,44 @@ Body`;
     expect(result.description).toBeUndefined();
     expect(result.body).toBe("Body");
   });
+
+  test("parses draft: true as boolean", () => {
+    const raw = `---
+title: Draft Post
+draft: true
+---
+Body`;
+    const result = parseFrontmatter(raw);
+    expect(result.draft).toBe(true);
+  });
+
+  test("parses draft: false as undefined", () => {
+    const raw = `---
+title: Published Post
+draft: false
+---
+Body`;
+    const result = parseFrontmatter(raw);
+    expect(result.draft).toBeUndefined();
+  });
+
+  test("parses tags from comma-separated string", () => {
+    const raw = `---
+title: Tagged Post
+tags: blog, hello, world
+---
+Body`;
+    const result = parseFrontmatter(raw);
+    expect(result.tags).toEqual(["blog", "hello", "world"]);
+  });
+
+  test("parses date as string", () => {
+    const raw = `---
+title: Dated Post
+date: 2025-01-01
+---
+Body`;
+    const result = parseFrontmatter(raw);
+    expect(result.date).toBe("2025-01-01");
+  });
 });

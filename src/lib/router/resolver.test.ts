@@ -81,4 +81,97 @@ describe("buildRouteMap", () => {
 
     expect(routeMap.has("/hello")).toBe(true);
   });
+
+  it("records date from page meta in manifest", () => {
+    const pageWithDate: RouteModule = {
+      default: () => null as unknown as React.ReactElement,
+      meta: { title: "Blog Post", date: "2025-06-15" },
+    };
+    const { manifest } = buildRouteMap({
+      pages: { "../routes/blog/post.tsx": pageWithDate },
+      layouts: {},
+      contents: {},
+    });
+
+    expect(manifest[0].date).toBe("2025-06-15");
+  });
+
+  it("falls back to path when title is empty string", () => {
+    const pageEmptyTitle: RouteModule = {
+      default: () => null as unknown as React.ReactElement,
+      meta: { title: "" },
+    };
+    const { manifest } = buildRouteMap({
+      pages: { "../routes/about.tsx": pageEmptyTitle },
+      layouts: {},
+      contents: {},
+    });
+
+    expect(manifest[0].title).toBe("/about");
+  });
+
+  it("populates markdownSources for markdown content files", () => {
+    const { markdownSources } = buildRouteMap({
+      pages: {},
+      layouts: {},
+      contents: {
+        "../routes/hello.md": "---\ntitle: Hello\n---\nBody content",
+      },
+    });
+
+    expect(markdownSources.has("/hello")).toBe(true);
+  });
+
+  it("returns raw content from markdownSources", async () => {
+    const raw = "---\ntitle: Hello\n---\nBody content";
+    const { markdownSources } = buildRouteMap({
+      pages: {},
+      layouts: {},
+      contents: { "../routes/hello.md": raw },
+    });
+
+    const getMarkdown = markdownSources.get("/hello");
+    expect(await getMarkdown!()).toBe(raw);
+  });
+
+  it("populates markdownSources for pages with markdown meta", async () => {
+    const pageWithMarkdown: RouteModule = {
+      default: () => null as unknown as React.ReactElement,
+      meta: { title: "Page", markdown: () => "# Hello" },
+    };
+    const { markdownSources } = buildRouteMap({
+      pages: { "../routes/page.tsx": pageWithMarkdown },
+      layouts: {},
+      contents: {},
+    });
+
+    expect(markdownSources.has("/page")).toBe(true);
+    const getMarkdown = markdownSources.get("/page");
+    expect(await getMarkdown!()).toBe("# Hello");
+  });
+
+  it("includes draft content in development mode", () => {
+    const { routeMap } = buildRouteMap({
+      pages: {},
+      layouts: {},
+      contents: {
+        "../routes/draft.md": "---\ntitle: Draft\ndraft: true\n---\nBody",
+      },
+    });
+
+    // In test environment, import.meta.env.PROD is false, so drafts are included
+    expect(routeMap.has("/draft")).toBe(true);
+  });
+
+  it("records date from markdown frontmatter in manifest", () => {
+    const { manifest } = buildRouteMap({
+      pages: {},
+      layouts: {},
+      contents: {
+        "../routes/post.md": "---\ntitle: Post\ndate: 2025-03-20\n---\nBody",
+      },
+    });
+
+    expect(manifest[0].date).toBe("2025-03-20");
+  });
 });
