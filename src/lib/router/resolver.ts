@@ -118,8 +118,9 @@ export function buildRouteMap(
     });
     manifest.push({
       path,
-      title: mod.meta?.title ?? path,
+      title: mod.meta?.title || path,
       description: mod.meta?.description,
+      date: mod.meta?.date,
     });
 
     const markdown = mod.meta?.markdown;
