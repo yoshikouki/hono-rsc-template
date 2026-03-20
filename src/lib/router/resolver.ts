@@ -29,6 +29,7 @@ export interface RouteGlobs {
 
 export interface BuildRouteMapResult {
   manifest: import("../../factory").RouteManifestEntry[];
+  markdownSources: Map<string, () => Promise<string>>;
   routeMap: Map<string, ResolvedRoute>;
 }
 
@@ -95,6 +96,7 @@ export function buildRouteMap(
 ): BuildRouteMapResult {
   const routeMap = new Map<string, ResolvedRoute>();
   const manifest: import("../../factory").RouteManifestEntry[] = [];
+  const markdownSources = new Map<string, () => Promise<string>>();
   const seen = new Map<string, string>();
 
   for (const [file, mod] of Object.entries(globs.pages)) {
@@ -118,8 +120,12 @@ export function buildRouteMap(
       path,
       title: mod.meta?.title ?? path,
       description: mod.meta?.description,
-      hasMarkdown: false,
     });
+
+    const markdown = mod.meta?.markdown;
+    if (markdown) {
+      markdownSources.set(path, () => Promise.resolve(markdown()));
+    }
   }
 
   for (const [file, raw] of Object.entries(globs.contents)) {
@@ -152,9 +158,9 @@ export function buildRouteMap(
       title: frontmatter.title || path,
       description: frontmatter.description,
       date: frontmatter.date,
-      hasMarkdown: true,
     });
+    markdownSources.set(path, () => Promise.resolve(raw));
   }
 
-  return { routeMap, manifest };
+  return { routeMap, manifest, markdownSources };
 }

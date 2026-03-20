@@ -24,11 +24,17 @@ export function createApp({
   site: SiteConfig;
 }) {
   const app = new Hono<AppEnv>();
-  const { routeMap: resolvedRouteMap } = buildRouteMap(globs);
+  const { routeMap: resolvedRouteMap, markdownSources } =
+    buildRouteMap(globs);
 
   app.onError((err, c) => {
     console.error(err);
     return c.text("Internal Server Error", 500);
+  });
+
+  app.use("*", async (c, next) => {
+    c.set("markdownSources", markdownSources);
+    await next();
   });
 
   app.route(

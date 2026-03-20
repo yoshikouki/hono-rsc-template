@@ -31,13 +31,13 @@ export type RenderPage = (
 export interface RouteManifestEntry {
   date?: string;
   description?: string;
-  hasMarkdown: boolean;
   path: string;
   title: string;
 }
 
 export interface AppEnv {
   Variables: {
+    markdownSources: Map<string, () => Promise<string>>;
     renderPage: RenderPage;
   };
 }
