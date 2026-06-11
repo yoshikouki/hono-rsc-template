@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && echo 'import handler from \"./rsc/index.js\"; export default { fetch: handler };' > dist/worker-entry.js",
+    "test": "vitest run",
     "preview": "NODE_ENV=production wrangler dev --local --port 8787",
     "deploy": "bun run build && wrangler deploy",
     "check": "ultracite check",
