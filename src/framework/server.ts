@@ -1,9 +1,15 @@
 import { Hono } from "hono";
 import { createMarkdownAdapter } from "./content/markdown";
 import { markdownResponse } from "./content/response";
-import { buildManifest, toMarkdownPath } from "./manifest";
+import { buildManifest, resolveLayoutChain, toMarkdownPath } from "./manifest";
 import { renderRouteToRscStream } from "./render";
-import type { AppEnv, RouteGlobs, RouteLoader, SiteConfig } from "./types";
+import type {
+  AppEnv,
+  AppRoute,
+  RouteGlobs,
+  RouteLoader,
+  SiteConfig,
+} from "./types";
 
 const RSC_CONTENT_TYPE = "text/x-component;charset=utf-8";
 const HTML_CONTENT_TYPE = "text/html;charset=utf-8";
@@ -19,16 +25,18 @@ type RenderHtml = (
   options: { signal: AbortSignal }
 ) => Promise<ReadableStream>;
 
-interface Renderer {
+export interface Renderer {
   renderHtml?: RenderHtml;
   renderRsc?: RenderRsc;
 }
 
-interface CreateAppOptions {
-  globs: RouteGlobs;
-  notFound?: RouteLoader;
+interface CreateAppOptions<TContext = unknown> {
+  createRequestContext?: (request: Request) => TContext | Promise<TContext>;
+  globs: RouteGlobs<TContext>;
+  notFound?: RouteLoader<TContext>;
   renderer?: Renderer;
-  site: SiteConfig;
+  routes?: AppRoute<TContext>[];
+  site: SiteConfig<TContext>;
 }
 
 async function defaultRenderHtml(
@@ -65,13 +73,15 @@ async function negotiateResponse(
   });
 }
 
-export function createApp({
+export function createApp<TContext = unknown>({
   site,
   globs,
   notFound,
   renderer = {},
-}: CreateAppOptions): Hono<AppEnv> {
-  const app = new Hono<AppEnv>();
+  routes: appRoutes,
+  createRequestContext,
+}: CreateAppOptions<TContext>): Hono<AppEnv> {
+  const app = new Hono<AppEnv>({ strict: false });
 
   const markdownAdapter = createMarkdownAdapter(
     site.renderMarkdown ??
@@ -81,9 +91,10 @@ export function createApp({
       })
   );
 
-  const manifest = buildManifest(globs, {
+  const manifest = buildManifest<TContext>(globs, {
     filterDrafts: import.meta.env.PROD,
     markdownAdapter,
+    routes: appRoutes,
   });
 
   const renderRsc = renderer.renderRsc;
@@ -91,11 +102,15 @@ export function createApp({
 
   // Global middleware
   app.use("*", async (c, next) => {
+    c.set("site", site as SiteConfig);
     c.set("markdownSources", manifest.markdownSources);
     c.set("routeManifest", manifest.entries);
     await next();
-    if (c.res.headers.get("Content-Type")?.includes("text/html")) {
-      c.res.headers.set("Speculation-Rules", '"/speculationrules.json"');
+    if (
+      site.speculationRulesPath &&
+      c.res.headers.get("Content-Type")?.includes("text/html")
+    ) {
+      c.res.headers.set("Speculation-Rules", `"${site.speculationRulesPath}"`);
     }
   });
 
@@ -107,8 +122,11 @@ export function createApp({
   // Page routes
   for (const route of manifest.routes) {
     app.get(route.path, async (c) => {
+      const context = createRequestContext
+        ? await createRequestContext(c.req.raw)
+        : (undefined as TContext);
       const rscStream = await renderRouteToRscStream(
-        { site, route, pathname: route.path },
+        { site, route, pathname: route.path, context },
         renderRsc
       );
       const response = await negotiateResponse(
@@ -143,14 +161,17 @@ export function createApp({
   if (notFound) {
     app.get("*", async (c) => {
       const pathname = new URL(c.req.url).pathname;
+      const context = createRequestContext
+        ? await createRequestContext(c.req.raw)
+        : (undefined as TContext);
       const mod = await notFound();
       const route = {
         meta: mod.meta ?? { title: pathname },
         load: notFound,
-        layouts: [],
+        layouts: resolveLayoutChain("/", globs.layouts),
       };
       const rscStream = await renderRouteToRscStream(
-        { site, route, pathname, noindex: true },
+        { site, route, pathname, noindex: true, context },
         renderRsc
       );
       const response = await negotiateResponse(

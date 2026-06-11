@@ -321,4 +321,82 @@ describe("buildManifest", () => {
     expect(manifest.handlers).toHaveLength(1);
     expect(manifest.handlers[0].path).toBe("/healthz");
   });
+
+  describe("programmatic routes (opts.routes)", () => {
+    it("adds programmatic routes to entries and routes", () => {
+      const load = makePageLoader("Book Detail");
+      const manifest = buildManifest(
+        { pages: {}, metas: {}, layouts: {}, contents: {}, handlers: {} },
+        {
+          ...opts,
+          routes: [{ path: "/books/123", meta: { title: "Book 123" }, load }],
+        }
+      );
+      expect(manifest.routes).toHaveLength(1);
+      expect(manifest.routes[0].path).toBe("/books/123");
+      expect(manifest.routes[0].meta.title).toBe("Book 123");
+      expect(manifest.entries).toHaveLength(1);
+      expect(manifest.entries[0].path).toBe("/books/123");
+    });
+
+    it("throws on duplicate between glob and programmatic route", () => {
+      const load = makePageLoader("Dup");
+      expect(() =>
+        buildManifest(
+          {
+            pages: { "../routes/about.tsx": makePageLoader("About") },
+            metas: {},
+            layouts: {},
+            contents: {},
+            handlers: {},
+          },
+          {
+            ...opts,
+            routes: [{ path: "/about", meta: { title: "About dup" }, load }],
+          }
+        )
+      ).toThrow(RE_DUPLICATE_ROUTE);
+    });
+
+    it("applies root layout chain to programmatic routes", () => {
+      const load = makePageLoader("Book");
+      const manifest = buildManifest(
+        {
+          pages: {},
+          metas: {},
+          layouts: { "../routes/layout.tsx": layoutLoader },
+          contents: {},
+          handlers: {},
+        },
+        {
+          ...opts,
+          routes: [{ path: "/books/123", meta: { title: "Book 123" }, load }],
+        }
+      );
+      expect(manifest.routes[0].layouts.map((l) => l.file)).toEqual([
+        "../routes/layout.tsx",
+      ]);
+    });
+
+    it("registers markdownSources for programmatic route with markdown meta", async () => {
+      const load = makePageLoader("Page");
+      const manifest = buildManifest(
+        { pages: {}, metas: {}, layouts: {}, contents: {}, handlers: {} },
+        {
+          ...opts,
+          routes: [
+            {
+              path: "/books/123",
+              meta: { title: "Book 123", markdown: () => "# Hello" },
+              load,
+            },
+          ],
+        }
+      );
+      expect(manifest.markdownSources.has("/books/123")).toBe(true);
+      expect(await manifest.markdownSources.get("/books/123")?.()).toBe(
+        "# Hello"
+      );
+    });
+  });
 });

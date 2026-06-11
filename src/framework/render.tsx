@@ -2,22 +2,24 @@ import type { ReactElement } from "react";
 import { renderDocument } from "./document";
 import type { LayoutModule, Route, SiteConfig } from "./types";
 
-export interface RenderRouteInput {
+export interface RenderRouteInput<TContext = unknown> {
+  context?: TContext;
   noindex?: boolean;
   pathname: string;
-  route: Pick<Route, "layouts" | "load" | "meta">;
-  site: SiteConfig;
+  route: Pick<Route<TContext>, "layouts" | "load" | "meta">;
+  site: SiteConfig<TContext>;
 }
 
 export type RenderRsc = (element: ReactElement) => Promise<ReadableStream>;
 
-export function composeWithLayouts(
+export function composeWithLayouts<TContext = unknown>(
   body: ReactElement,
-  layoutModules: LayoutModule[]
+  layoutModules: LayoutModule<TContext>[],
+  context: TContext
 ): ReactElement {
   let composed = body;
   for (let i = layoutModules.length - 1; i >= 0; i -= 1) {
-    composed = layoutModules[i].default({ children: composed });
+    composed = layoutModules[i].default({ children: composed, context });
   }
   return composed;
 }
@@ -42,10 +44,11 @@ export function resolveJsonLd(
   return [...defaultLd, ...(meta.jsonLd ?? [])];
 }
 
-export async function buildDocumentElement(
-  input: RenderRouteInput
+export async function buildDocumentElement<TContext = unknown>(
+  input: RenderRouteInput<TContext>
 ): Promise<ReactElement> {
   const { site, route, pathname } = input;
+  const context = input.context as TContext;
   const meta = route.meta;
   const title = meta.title || pathname;
 
@@ -55,7 +58,7 @@ export async function buildDocumentElement(
   ]);
 
   const jsonLd = resolveJsonLd(
-    site,
+    site as SiteConfig<unknown>,
     {
       title,
       description: meta.description,
@@ -65,9 +68,14 @@ export async function buildDocumentElement(
     pathname
   );
 
-  const body = composeWithLayouts(await pageModule.default(), layoutModules);
+  const body = composeWithLayouts(
+    await pageModule.default({ context }),
+    layoutModules,
+    context
+  );
 
   return renderDocument(site, {
+    context,
     title,
     description: meta.description,
     pathname,
@@ -78,8 +86,8 @@ export async function buildDocumentElement(
   });
 }
 
-export async function renderRouteToRscStream(
-  input: RenderRouteInput,
+export async function renderRouteToRscStream<TContext = unknown>(
+  input: RenderRouteInput<TContext>,
   renderRsc?: RenderRsc
 ): Promise<ReadableStream> {
   const element = await buildDocumentElement(input);

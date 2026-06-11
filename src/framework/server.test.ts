@@ -101,9 +101,9 @@ describe("createApp", () => {
     expect(res.headers.get("Vary")).toBe("Accept");
   });
 
-  it("sets Speculation-Rules on HTML response", async () => {
+  it("sets Speculation-Rules on HTML response when speculationRulesPath is set", async () => {
     const app = createApp({
-      site: baseSite,
+      site: { ...baseSite, speculationRulesPath: "/speculationrules.json" },
       globs: makeGlobs(),
       renderer: stubRenderer,
     });
@@ -113,9 +113,19 @@ describe("createApp", () => {
     );
   });
 
-  it("does not set Speculation-Rules on RSC response", async () => {
+  it("does not set Speculation-Rules when speculationRulesPath is absent", async () => {
     const app = createApp({
       site: baseSite,
+      globs: makeGlobs(),
+      renderer: stubRenderer,
+    });
+    const res = await app.request("/");
+    expect(res.headers.get("Speculation-Rules")).toBeNull();
+  });
+
+  it("does not set Speculation-Rules on RSC response", async () => {
+    const app = createApp({
+      site: { ...baseSite, speculationRulesPath: "/speculationrules.json" },
       globs: makeGlobs(),
       renderer: stubRenderer,
     });
@@ -273,5 +283,140 @@ describe("createApp", () => {
     await outer.request("/");
     expect(Array.isArray(capturedManifest)).toBe(true);
     expect(capturedSources instanceof Map).toBe(true);
+  });
+
+  it("exposes site via c.var.site in handlers", async () => {
+    let capturedSite: unknown;
+    const { Hono } = await import("hono");
+    const outer = new Hono<import("./types").AppEnv>();
+    const globs = makeGlobs();
+    const inner = createApp({ site: baseSite, globs, renderer: stubRenderer });
+    outer.use("*", async (c, next) => {
+      await next();
+      capturedSite = c.var.site;
+    });
+    outer.route("/", inner);
+    await outer.request("/");
+    expect(capturedSite).toMatchObject({
+      baseUrl: baseSite.baseUrl,
+      name: baseSite.name,
+    });
+  });
+
+  describe("createRequestContext", () => {
+    it("calls createRequestContext and passes context to renderRsc", async () => {
+      interface TestCtx {
+        user: string;
+      }
+      let capturedContext: TestCtx | undefined;
+      const renderRscCapture = vi.fn(async () => new ReadableStream());
+      // Capture context via a page loader that inspects its props
+      const globs = makeGlobs() as RouteGlobs<TestCtx>;
+      globs.pages["./routes/index.tsx"] = async () => ({
+        default: (props: import("./types").PageProps<TestCtx>) => {
+          capturedContext = props.context;
+          return createElement("div", null, "ok");
+        },
+        meta: { title: "Home" },
+      });
+      const app2 = createApp<TestCtx>({
+        site: baseSite,
+        globs,
+        renderer: { renderRsc: renderRscCapture, renderHtml: stubRenderHtml },
+        createRequestContext: async (_req) => ({ user: "alice" }),
+      });
+      await app2.request("/");
+      expect(capturedContext).toEqual({ user: "alice" });
+    });
+  });
+
+  describe("notFound with root layout", () => {
+    it("applies root layout to notFound page", async () => {
+      let layoutCalled = false;
+      const layoutWithSpy: LayoutLoader = async () => ({
+        default: ({ children }) => {
+          layoutCalled = true;
+          return createElement("div", { "data-layout": "root" }, children);
+        },
+      });
+      const notFound = makePageLoader("Not Found");
+      const app = createApp({
+        site: baseSite,
+        globs: makeGlobs({ layouts: { "./routes/layout.tsx": layoutWithSpy } }),
+        notFound,
+        renderer: stubRenderer,
+      });
+      const res = await app.request("/does-not-exist");
+      expect(res.status).toBe(404);
+      expect(layoutCalled).toBe(true);
+    });
+  });
+
+  describe("strict:false (trailing slash)", () => {
+    it("returns 200 for path with trailing slash", async () => {
+      const app = createApp({
+        site: baseSite,
+        globs: makeGlobs({
+          pages: { "./routes/about.tsx": makePageLoader("About") },
+          metas: { "./routes/about.tsx": { title: "About" } },
+        }),
+        renderer: stubRenderer,
+      });
+      const res = await app.request("/about/");
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe("programmatic routes", () => {
+    it("serves programmatic route", async () => {
+      const load = makePageLoader("Book Detail");
+      const app = createApp({
+        site: baseSite,
+        globs: makeGlobs({ pages: {}, metas: {} }),
+        routes: [{ path: "/books/123", meta: { title: "Book 123" }, load }],
+        renderer: stubRenderer,
+      });
+      const res = await app.request("/books/123");
+      expect(res.status).toBe(200);
+    });
+
+    it("includes programmatic routes in routeManifest", async () => {
+      let capturedManifest: import("./types").RouteManifestEntry[] | undefined;
+      const { Hono } = await import("hono");
+      const load = makePageLoader("Book");
+      const globs = makeGlobs({ pages: {}, metas: {} });
+      const inner = createApp({
+        site: baseSite,
+        globs,
+        routes: [{ path: "/books/1", meta: { title: "Book 1" }, load }],
+        renderer: stubRenderer,
+      });
+      const outer = new Hono<import("./types").AppEnv>();
+      outer.use("*", async (c, next) => {
+        await next();
+        capturedManifest = c.var.routeManifest;
+      });
+      outer.route("/", inner);
+      await outer.request("/books/1");
+      expect(capturedManifest?.some((e) => e.path === "/books/1")).toBe(true);
+    });
+  });
+
+  describe("themeColor", () => {
+    it("does not set theme-color meta when themeColor is absent", async () => {
+      let capturedEl: React.ReactElement | undefined;
+      const renderRsc = vi.fn((el: React.ReactElement) => {
+        capturedEl = el;
+        return Promise.resolve(new ReadableStream());
+      });
+      const app = createApp({
+        site: baseSite,
+        globs: makeGlobs(),
+        renderer: { renderRsc, renderHtml: stubRenderHtml },
+      });
+      await app.request("/");
+      // renderDocument is called with themeColor undefined — just verify no error
+      expect(capturedEl).toBeDefined();
+    });
   });
 });

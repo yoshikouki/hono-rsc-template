@@ -27,7 +27,7 @@ const makeRoute = (
 describe("composeWithLayouts", () => {
   it("returns body unchanged when no layouts", () => {
     const body = createElement("div", null, "body");
-    expect(composeWithLayouts(body, [])).toBe(body);
+    expect(composeWithLayouts(body, [], undefined)).toBe(body);
   });
 
   it("wraps body in layouts inner-to-outer", () => {
@@ -42,7 +42,7 @@ describe("composeWithLayouts", () => {
           ({ type: "middle", children }) as unknown as React.ReactElement,
       },
     ];
-    const result = composeWithLayouts(body, layouts) as unknown as {
+    const result = composeWithLayouts(body, layouts, undefined) as unknown as {
       type: string;
       children: unknown;
     };

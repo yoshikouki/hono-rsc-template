@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import type { SiteConfig } from "./types";
 
-export interface DocumentOptions {
+export interface DocumentOptions<TContext = unknown> {
   body: ReactNode;
+  context?: TContext;
   description?: string;
   jsonLd?: unknown[];
   noindex?: boolean;
@@ -11,8 +12,8 @@ export interface DocumentOptions {
   title: string;
 }
 
-export function renderDocument(
-  site: SiteConfig,
+export function renderDocument<TContext = unknown>(
+  site: SiteConfig<TContext>,
   {
     title,
     description,
@@ -21,20 +22,27 @@ export function renderDocument(
     jsonLd = [],
     ogImage,
     noindex,
-  }: DocumentOptions
+    context,
+  }: DocumentOptions<TContext>
 ) {
   const canonical = `${site.baseUrl}${pathname}`;
   const resolvedOgImage = ogImage || site.defaultOgImage;
   const documentTitle = site.formatTitle
     ? site.formatTitle(title, pathname)
     : title;
+  const resolvedContext = context as TContext;
+  const htmlAttrs = site.htmlAttributes?.(resolvedContext) ?? {};
+  const resolvedHead =
+    typeof site.head === "function" ? site.head(resolvedContext) : site.head;
 
   return (
-    <html lang={site.lang ?? "ja"}>
+    <html lang={site.lang ?? "ja"} {...htmlAttrs}>
       <head>
         <meta charSet="utf-8" />
         <meta content="width=device-width, initial-scale=1" name="viewport" />
-        <meta content="#000000" name="theme-color" />
+        {site.themeColor ? (
+          <meta content={site.themeColor} name="theme-color" />
+        ) : null}
         <title>{documentTitle}</title>
         {description ? <meta content={description} name="description" /> : null}
         {site.keywords ? (
@@ -73,13 +81,13 @@ export function renderDocument(
           <script
             // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD requires inline script injection
             dangerouslySetInnerHTML={{ __html: JSON.stringify(item) }}
-            // biome-ignore lint/suspicious/noArrayIndexKey: JSON-LD items have no stable identifier
+            // biome-ignore lint/suspicious/noArrayIndexKey: JSON-LD items are static per render and have no stable id
             key={i}
             type="application/ld+json"
           />
         ))}
 
-        {site.head}
+        {resolvedHead}
       </head>
       <body className={site.bodyClassName}>{body}</body>
     </html>
