@@ -1,4 +1,4 @@
-import type { RouteMeta } from "@/factory";
+import type { RouteMeta } from "@/framework/types";
 
 export const meta: RouteMeta = {
   title: "About",

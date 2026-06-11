@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { AppEnv } from "@/factory";
+import type { AppEnv } from "@/framework/types";
 
 const app = new Hono<AppEnv>();
 

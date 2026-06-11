@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && echo 'import handler from \"./rsc/index.js\"; export default { fetch: handler };' > dist/worker-entry.js",
-    "preview": "wrangler dev --local --port 8787",
+    "preview": "NODE_ENV=production wrangler dev --local --port 8787",
     "deploy": "bun run build && wrangler deploy",
     "check": "ultracite check",
     "fix": "ultracite fix"
@@ -22,6 +22,7 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.0.0",
     "tailwindcss": "^4.2.2",
+    "rsc-html-stream": "^0.0.6",
     "unified": "^11.0.0"
   },
   "devDependencies": {
