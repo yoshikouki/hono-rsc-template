@@ -2,8 +2,8 @@ import { Hono } from "hono";
 
 const app = new Hono();
 
-app.get("/", (c) => {
-  return c.json({
+app.get("/", (c) =>
+  c.json({
     prefetch: [
       {
         source: "document",
@@ -19,7 +19,7 @@ app.get("/", (c) => {
         eagerness: "moderate",
       },
     ],
-  });
-});
+  })
+);
 
 export default app;

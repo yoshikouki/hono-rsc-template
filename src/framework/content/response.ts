@@ -5,9 +5,8 @@ interface MarkdownResponseOptions {
   varyAccept?: boolean;
 }
 
-const estimateTokens = (content: string): string => {
-  return Math.max(1, Math.ceil(content.length / 4)).toString();
-};
+const estimateTokens = (content: string): string =>
+  Math.max(1, Math.ceil(content.length / 4)).toString();
 
 export const markdownResponse = (
   content: string,

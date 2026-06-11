@@ -90,9 +90,64 @@ Place a file in `src/routes/` — no manual registration needed.
 ## Key Types (framework/types.ts)
 
 - `RouteMeta` — Page metadata (title, description, date, tags, ogImage, cacheControl, jsonLd, markdown, noindex, draft)
-- `RouteModule` — Page module (default component + meta)
-- `SiteConfig` — Site-specific config (baseUrl, name, head, formatTitle, renderMarkdown, etc.)
-- `AppEnv` — Hono environment variables (markdownSources, routeManifest)
+- `RouteModule<TContext>` — Page module (default component + meta). The default export receives `{ context: TContext }`.
+- `PageProps<TContext>` — Props received by page/layout components when `createRequestContext` is used.
+- `AppRoute<TContext>` — Programmatic route descriptor `{ path, meta, load }` for DB/CMS-driven pages.
+- `SiteConfig<TContext>` — Site-specific config (baseUrl, name, head, formatTitle, renderMarkdown, speculationRulesPath, themeColor, htmlAttributes, etc.)
+- `AppEnv` — Hono environment variables (`markdownSources`, `routeManifest`, `site`)
+
+## Framework Extension Points
+
+### Programmatic Routes (DB/CMS-driven pages)
+
+Pass `routes` to `createApp()` to register pages that don't come from the filesystem:
+
+```tsx
+createApp({
+  site,
+  globs: routeGlobs,
+  routes: [
+    { path: "/books/123", meta: { title: "Book 123" }, load: () => import("./BookPage") },
+  ],
+});
+```
+
+These routes are included in `routeManifest` (→ sitemap) and get the root layout chain automatically.
+
+### createRequestContext (request-dependent rendering)
+
+Supply a factory to thread per-request data through to pages and layouts via `props.context`:
+
+```tsx
+createApp({
+  site,
+  globs: routeGlobs,
+  createRequestContext: async (req) => {
+    const user = await getUser(req.headers.get("Cookie") ?? "");
+    return { user };
+  },
+});
+```
+
+Pages and layouts receive `context` as a prop:
+
+```tsx
+export default function Page({ context }: PageProps<{ user: string }>) {
+  return <main>Hello {context.user}</main>;
+}
+```
+
+### c.var.site + manifest-driven handlers
+
+Every handler route can read `c.var.site`, `c.var.routeManifest`, and `c.var.markdownSources` via the Hono context. The sitemap handler is a built-in example:
+
+```ts
+// src/routes/sitemap.xml.ts
+import { createSitemapApp } from "@/framework/handlers/sitemap";
+export default createSitemapApp();
+```
+
+`createSitemapApp` accepts an optional `{ filter }` to exclude entries.
 
 ## Important Technical Notes
 

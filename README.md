@@ -149,6 +149,68 @@ export interface Env {
 
 3. Use it via `c.env` in any Hono route handler.
 
+## Framework Extension Points
+
+### Programmatic Routes (DB/CMS-driven pages)
+
+Pages that don't come from the filesystem — e.g. items fetched from a database or CMS — can be supplied as `AppRoute[]` to `createApp()`:
+
+```tsx
+createApp({
+  site,
+  globs: routeGlobs,
+  routes: [
+    { path: "/books/123", meta: { title: "Book 123" }, load: () => import("./BookPage") },
+  ],
+});
+```
+
+These routes appear in `routeManifest` (used by the sitemap handler), inherit the root layout chain, and support `.md` auto-generation.
+
+### createRequestContext (per-request data)
+
+Thread request-derived data (auth, cookies, locale, …) through to every page and layout via `props.context`:
+
+```tsx
+// src/site.tsx — add createRequestContext to createApp call in entry.rsc.tsx
+export function createRequestContext(req: Request) {
+  return { user: parseUserFromCookie(req.headers.get("Cookie") ?? "") };
+}
+```
+
+```tsx
+// a page
+export default function Page({ context }: PageProps<{ user: string }>) {
+  return <main>Hello {context.user}</main>;
+}
+```
+
+### c.var.site + manifest-driven handlers
+
+Every Hono handler route automatically has access to `c.var.site` (the `SiteConfig`), `c.var.routeManifest`, and `c.var.markdownSources`. The built-in sitemap helper demonstrates this pattern:
+
+```ts
+// src/routes/sitemap.xml.ts
+import { createSitemapApp } from "@/framework/handlers/sitemap";
+export default createSitemapApp();
+// optional: createSitemapApp({ filter: (e) => !e.path.startsWith("/draft") })
+```
+
+### SiteConfig: speculationRulesPath, themeColor, htmlAttributes
+
+```tsx
+export const site: SiteConfig = {
+  // Adds Speculation-Rules header to every HTML response
+  speculationRulesPath: "/speculationrules.json",
+  // Adds <meta name="theme-color">
+  themeColor: "#000000",
+  // Adds attributes to <html> (e.g. dark-mode class)
+  htmlAttributes: (ctx) => ({ "data-theme": ctx.theme }),
+  // head can also be a function for per-request rendering
+  head: (ctx) => <link rel="alternate" hrefLang={ctx.lang} href="..." />,
+};
+```
+
 ## Limitations
 
 - **Server Actions** (`"use server"`) are not implemented. Use Hono RPC (`.ts` handler routes) instead.
