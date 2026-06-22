@@ -7,7 +7,7 @@ A minimal template for running **React Server Components** on **Cloudflare Worke
 - **React 19** — Server Components + Streaming SSR
 - **Hono** — Handles all routing (pages + API)
 - **`@vitejs/plugin-rsc`** — RSC protocol implementation (Vite 6 Environment API)
-- **`rsc-html-stream`** — Inlines RSC payload into HTML (no separate `/__rsc/` fetch)
+- **Dedicated `/__rsc` routes** — Separates the hydration payload from the initial HTML response
 - **Cloudflare Workers** — edge runtime
 
 ## Get Started
@@ -27,8 +27,8 @@ bun run deploy   # deploy to Cloudflare Workers
 | Environment | Role | Entry |
 |---|---|---|
 | `rsc` | RSC rendering + all routing | `src/framework/entry.rsc.tsx` |
-| `ssr` | Convert RSC stream → HTML + inject inline RSC payload | `src/framework/entry.ssr.tsx` |
-| `client` | Hydration from inline payload | `src/framework/entry.browser.tsx` |
+| `ssr` | Convert RSC stream → initial HTML | `src/framework/entry.ssr.tsx` |
+| `client` | Fetch `/__rsc/...` and hydrate | `src/framework/entry.browser.tsx` |
 
 ### Request Flow
 
@@ -39,32 +39,31 @@ Browser → GET /
   → entry.rsc.tsx: createApp() → Hono handles route
   → render.tsx: renderRouteToRscStream() → RSC stream
   → entry.ssr.tsx: createFromReadableStream() + renderToReadableStream()
-                   + injectRSCPayload() inline into HTML
-  → Response: Content-Type: text/html  (RSC payload embedded)
+  → Response: Content-Type: text/html
 ```
 
-**RSC navigation (Accept: text/x-component)**
+**Hydration payload**
 
 ```
-Browser → GET / (Accept: text/x-component)
-  → server.ts: acceptsRsc() → returns RSC stream directly
+Browser → GET /__rsc
+  → server.ts: dedicated RSC route → returns RSC stream directly
   → Response: Content-Type: text/x-component
 ```
 
 **Hydration**
 
 ```
-Browser: rscStream from inline <script> → createFromReadableStream() → hydrateRoot()
+Browser: createFromFetch(fetch("/__rsc/...")) → hydrateRoot()
 ```
 
-### Content Negotiation (vs `/__rsc/` path prefix)
+### RSC Payload Routing
 
-Same URL serves both HTML and RSC payload via the `Accept` header:
+HTML and RSC payloads use separate URLs:
 
-- `Accept: text/html` (or default) → HTML response with inline RSC payload
-- `Accept: text/x-component` → RSC payload stream
+- `/about` → HTML response for the initial render
+- `/__rsc/about` → RSC payload used for hydration and RSC refreshes
 
-This approach eliminates the `/__rsc/` path prefix and uses `Vary: Accept` for correct CDN caching.
+This keeps the initial HTML response focused on first paint and avoids relying on `Vary: Accept` for shared CDN cache separation. RSC responses are returned with `Cache-Control: private, no-store`; route-level `cacheControl` applies to HTML responses only.
 
 ## File Structure
 
@@ -214,3 +213,5 @@ export const site: SiteConfig = {
 ## Limitations
 
 - **Server Actions** (`"use server"`) are not implemented. Use Hono RPC (`.ts` handler routes) instead.
+- Initial hydration performs a follow-up `/__rsc/...` request instead of using an inline RSC payload.
+- Initial HTML and `/__rsc/...` are separate renders. Keep initial client component output deterministic, and move browser-time values such as clocks into effects after hydration.

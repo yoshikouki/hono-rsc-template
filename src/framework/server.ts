@@ -13,9 +13,23 @@ import type {
 
 const RSC_CONTENT_TYPE = "text/x-component;charset=utf-8";
 const HTML_CONTENT_TYPE = "text/html;charset=utf-8";
+const RSC_CACHE_CONTROL = "private, no-store";
+const RSC_ROUTE_PREFIX = "/__rsc";
 
-export function acceptsRsc(request: Request): boolean {
-  return request.headers.get("Accept")?.includes("text/x-component") ?? false;
+export function rscPathFor(path: string): string {
+  return path === "/" ? RSC_ROUTE_PREFIX : `${RSC_ROUTE_PREFIX}${path}`;
+}
+
+export function pagePathFromRscPath(pathname: string): string | null {
+  if (pathname === RSC_ROUTE_PREFIX || pathname === `${RSC_ROUTE_PREFIX}/`) {
+    return "/";
+  }
+
+  if (!pathname.startsWith(`${RSC_ROUTE_PREFIX}/`)) {
+    return null;
+  }
+
+  return pathname.slice(RSC_ROUTE_PREFIX.length);
 }
 
 type RenderRsc = Parameters<typeof renderRouteToRscStream>[1];
@@ -51,26 +65,27 @@ async function defaultRenderHtml(
   return ssrEntry.renderHtml(rscStream, options);
 }
 
-async function negotiateResponse(
+async function renderHtmlResponse(
   request: Request,
   rscStream: ReadableStream,
   renderHtml: RenderHtml
 ): Promise<Response> {
-  if (acceptsRsc(request)) {
-    return new Response(rscStream, {
-      headers: {
-        "Content-Type": RSC_CONTENT_TYPE,
-        Vary: "Accept",
-      },
-    });
-  }
   const htmlStream = await renderHtml(rscStream, { signal: request.signal });
   return new Response(htmlStream, {
     headers: {
       "Content-Type": HTML_CONTENT_TYPE,
-      Vary: "Accept",
     },
   });
+}
+
+function renderRscResponse(
+  rscStream: ReadableStream,
+  init: ResponseInit = {}
+): Response {
+  const headers = new Headers(init.headers);
+  headers.set("Content-Type", RSC_CONTENT_TYPE);
+  headers.set("Cache-Control", RSC_CACHE_CONTROL);
+  return new Response(rscStream, { ...init, headers });
 }
 
 export function createApp<TContext = unknown>({
@@ -129,7 +144,7 @@ export function createApp<TContext = unknown>({
         { site, route, pathname: route.path, context },
         renderRsc
       );
-      const response = await negotiateResponse(
+      const response = await renderHtmlResponse(
         c.req.raw,
         rscStream,
         renderHtml
@@ -140,6 +155,17 @@ export function createApp<TContext = unknown>({
       }
 
       return response;
+    });
+
+    app.get(rscPathFor(route.path), async (c) => {
+      const context = createRequestContext
+        ? await createRequestContext(c.req.raw)
+        : (undefined as TContext);
+      const rscStream = await renderRouteToRscStream(
+        { site, route, pathname: route.path, context },
+        renderRsc
+      );
+      return renderRscResponse(rscStream);
     });
 
     // .md auto-generation
@@ -160,7 +186,9 @@ export function createApp<TContext = unknown>({
   // Not found
   if (notFound) {
     app.get("*", async (c) => {
-      const pathname = new URL(c.req.url).pathname;
+      const requestPathname = new URL(c.req.url).pathname;
+      const rscPagePath = pagePathFromRscPath(requestPathname);
+      const pathname = rscPagePath ?? requestPathname;
       const context = createRequestContext
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
@@ -174,7 +202,12 @@ export function createApp<TContext = unknown>({
         { site, route, pathname, noindex: true, context },
         renderRsc
       );
-      const response = await negotiateResponse(
+
+      if (rscPagePath) {
+        return renderRscResponse(rscStream, { status: 404 });
+      }
+
+      const response = await renderHtmlResponse(
         c.req.raw,
         rscStream,
         renderHtml

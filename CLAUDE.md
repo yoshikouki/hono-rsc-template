@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Hono + React Server Components (RSC) template running on Cloudflare Workers. Uses `@vitejs/plugin-rsc` for RSC protocol with 3-environment build (RSC/SSR/Client). RSC payload is inlined into HTML via `rsc-html-stream`; no `/__rsc/` path prefix.
+Hono + React Server Components (RSC) template running on Cloudflare Workers. Uses `@vitejs/plugin-rsc` for RSC protocol with 3-environment build (RSC/SSR/Client). Initial HTML and RSC payloads are separated by URL: page routes return HTML, and `/__rsc/...` routes return RSC payloads.
 
 ## Commands
 
@@ -32,10 +32,10 @@ src/
 │   │   └── response.ts    # text/markdown response helpers
 │   ├── document.tsx      # HTML document shell (SiteConfig-driven)
 │   ├── render.tsx        # document ∘ layouts ∘ page composition + RSC stream
-│   ├── server.ts         # createApp: Hono router assembly + Accept negotiation
+│   ├── server.ts         # createApp: Hono router assembly + /__rsc route separation
 │   ├── entry.rsc.tsx     # RSC entry (thin — imports site.tsx)
-│   ├── entry.ssr.tsx     # SSR entry (RSC stream tee + injectRSCPayload)
-│   └── entry.browser.tsx # Hydrate from inline RSC payload (no extra fetch)
+│   ├── entry.ssr.tsx     # SSR entry (RSC stream → initial HTML)
+│   └── entry.browser.tsx # Fetch /__rsc payload and hydrate
 ├── lib/
 │   └── markdown/
 │       ├── render.ts      # MD → React conversion (remark/rehype)
@@ -48,14 +48,16 @@ src/
 ### RSC 3 Environments
 
 - **rsc** (`entry.rsc.tsx`) — Server Components rendering + page routing
-- **ssr** (`entry.ssr.tsx`) — RSC → HTML stream conversion + RSC payload inline injection (rsc-html-stream)
-- **client** (`entry.browser.tsx`) — Hydration from inline payload (no additional fetch)
+- **ssr** (`entry.ssr.tsx`) — RSC → initial HTML stream conversion
+- **client** (`entry.browser.tsx`) — Fetch `/__rsc/...` payload and hydrate
 
 ### Rendering Pipeline
 
-`route → meta → page ∘ layouts ∘ document → RSC stream → (HTML with inline payload)`
+`route → meta → page ∘ layouts ∘ document → RSC stream → HTML`
 
-- Same URL: `Accept: text/x-component` → RSC payload; otherwise → HTML (content negotiation, `Vary: Accept`)
+- Page URL: `/about` → HTML. RSC URL: `/__rsc/about` → `text/x-component`.
+- RSC responses are `Cache-Control: private, no-store`; route-level `cacheControl` applies to HTML responses only.
+- Initial HTML and `/__rsc/...` are separate renders. Keep initial client component output deterministic; move browser-time values into effects after hydration.
 - `manifest.ts` is a pure function (no React/Hono deps) and is unit-testable. Hono wiring is in `server.ts`
 - **Server Actions are not implemented.** Use Hono RPC (`.ts` handler routes) for API calls.
 

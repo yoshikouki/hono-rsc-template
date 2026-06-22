@@ -13,6 +13,7 @@ app.get("/", (c) =>
             { not: { href_matches: "/*.xml" } },
             { not: { href_matches: "/*.txt" } },
             { not: { href_matches: "/*.json" } },
+            { not: { href_matches: "/__rsc" } },
             { not: { href_matches: "/__rsc/*" } },
           ],
         },

@@ -1,20 +1,27 @@
-import { createFromReadableStream } from "@vitejs/plugin-rsc/browser";
+import { createFromFetch } from "@vitejs/plugin-rsc/browser";
 import type { ReactNode } from "react";
 import { hydrateRoot } from "react-dom/client";
-import { rscStream } from "rsc-html-stream/client";
+
+function rscUrlFor(url: URL): string {
+  const pathname = url.pathname === "/" ? "/__rsc" : `/__rsc${url.pathname}`;
+  return `${pathname}${url.search}`;
+}
+
+function fetchRsc(url = new URL(window.location.href)) {
+  return createFromFetch<ReactNode>(
+    fetch(rscUrlFor(url), {
+      headers: { accept: "text/x-component" },
+    })
+  );
+}
 
 async function main() {
-  const initial = await createFromReadableStream<ReactNode>(rscStream);
+  const initial = await fetchRsc();
   const root = hydrateRoot(document, initial);
 
   if (import.meta.hot) {
     import.meta.hot.on("rsc:update", async () => {
-      const { createFromFetch } = await import("@vitejs/plugin-rsc/browser");
-      const next = await createFromFetch<ReactNode>(
-        fetch(window.location.href, {
-          headers: { accept: "text/x-component" },
-        })
-      );
+      const next = await fetchRsc();
       root.render(next);
     });
   }
