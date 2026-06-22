@@ -29,7 +29,6 @@ export function createSitemapApp(options?: SitemapOptions): Hono<AppEnv> {
     ].join("\n");
 
     c.header("Content-Type", "application/xml; charset=utf-8");
-    c.header("Cache-Control", "public, max-age=3600");
     return c.body(xml);
   });
 

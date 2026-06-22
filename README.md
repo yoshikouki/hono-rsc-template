@@ -190,9 +190,14 @@ For site-index endpoints such as sitemap or `llms.txt`, dynamic lists can be sup
 import type { RouteManifestEntry } from "@/framework/types";
 
 export async function enumerate(): Promise<RouteManifestEntry[]> {
-  return [{ path: "/books/123", title: "Book 123" }];
+  return [
+    { path: "/books/123", title: "Book 123" },
+    { path: "/books/draft", title: "Draft Book", draft: true },
+  ];
 }
 ```
+
+Draft entries returned from `enumerate()` are excluded from `routeManifest()` in production.
 
 Dynamic filename routing such as `src/routes/books/[id]/index.tsx` is not implemented yet.
 
@@ -224,6 +229,8 @@ import { createSitemapApp } from "@/framework/handlers/sitemap";
 export default createSitemapApp();
 // optional: createSitemapApp({ filter: (e) => !e.path.startsWith("/draft") })
 ```
+
+The built-in sitemap handler does not set `Cache-Control` by default.
 
 ### SiteConfig: speculationRulesPath, themeColor, htmlAttributes
 

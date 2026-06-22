@@ -90,6 +90,13 @@ function renderRscResponse(
   return new Response(rscStream, { ...init, headers });
 }
 
+export function includeRouteManifestEntry(
+  entry: { draft?: boolean },
+  env: Pick<ImportMetaEnv, "PROD"> = import.meta.env
+): boolean {
+  return !(entry.draft && env.PROD);
+}
+
 async function collectRouteManifest<TContext = unknown>(
   routes: Route<TContext>[],
   request: Request,
@@ -100,7 +107,11 @@ async function collectRouteManifest<TContext = unknown>(
   for (const route of routes) {
     const pageModule = await route.load();
     if (pageModule.enumerate) {
-      entries.push(...(await pageModule.enumerate({ context, request })));
+      entries.push(
+        ...(await pageModule.enumerate({ context, request })).filter((entry) =>
+          includeRouteManifestEntry(entry)
+        )
+      );
       continue;
     }
 
@@ -111,7 +122,7 @@ async function collectRouteManifest<TContext = unknown>(
       request,
     });
 
-    if (meta.draft && import.meta.env.PROD) {
+    if (!includeRouteManifestEntry(meta)) {
       continue;
     }
 

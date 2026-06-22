@@ -57,9 +57,10 @@ src/
 
 - Page URL: `/about` → HTML. RSC URL: `/__rsc/about` → `text/x-component`.
 - RSC responses are `Cache-Control: private, no-store`; route-level `cacheControl` applies to HTML responses only.
+- The built-in sitemap handler does not set `Cache-Control` by default.
 - Initial HTML and `/__rsc/...` are separate renders. Keep initial client component output deterministic; move browser-time values into effects after hydration.
 - `manifest.ts` builds only the route graph (path + loader + layout chain). It must not eager-load page modules for metadata.
-- Page metadata is request-time via `resolveMeta()`. Site-index metadata is async via `routeManifest()` and optional page-module `enumerate()`.
+- Page metadata is request-time via `resolveMeta()`. Site-index metadata is async via `routeManifest()` and optional page-module `enumerate()`; draft entries are excluded from `routeManifest()` in production.
 - Dynamic filename routes such as `[id]` are not implemented yet; leave the WIP marker in `manifest.ts` until the convention is designed.
 - **Server Actions are not implemented.** Use Hono RPC (`.ts` handler routes) for API calls.
 

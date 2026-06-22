@@ -1,6 +1,11 @@
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { createApp, pagePathFromRscPath, rscPathFor } from "./server";
+import {
+  createApp,
+  includeRouteManifestEntry,
+  pagePathFromRscPath,
+  rscPathFor,
+} from "./server";
 import type {
   LayoutLoader,
   RouteGlobs,
@@ -73,6 +78,24 @@ describe("pagePathFromRscPath", () => {
 
   it("returns null for normal page paths", () => {
     expect(pagePathFromRscPath("/about")).toBeNull();
+  });
+});
+
+describe("includeRouteManifestEntry", () => {
+  it("includes draft entries outside production", () => {
+    expect(includeRouteManifestEntry({ draft: true }, { PROD: false })).toBe(
+      true
+    );
+  });
+
+  it("excludes draft entries in production", () => {
+    expect(includeRouteManifestEntry({ draft: true }, { PROD: true })).toBe(
+      false
+    );
+  });
+
+  it("includes non-draft entries in production", () => {
+    expect(includeRouteManifestEntry({}, { PROD: true })).toBe(true);
   });
 });
 
@@ -303,6 +326,34 @@ describe("createApp", () => {
     await outer.request("/");
     expect(Array.isArray(capturedManifest)).toBe(true);
     expect(capturedSources instanceof Map).toBe(true);
+  });
+
+  it("preserves enumerate draft entries outside production", async () => {
+    const { Hono } = await import("hono");
+    const handler = new Hono<import("./types").AppEnv>();
+    handler.get("/", async (c) => c.json(await c.var.routeManifest()));
+
+    const globs = makeGlobs({
+      handlers: { "./routes/manifest.ts": handler },
+      pages: {
+        "./routes/books.tsx": async (): Promise<RouteModule> => ({
+          default: () => createElement("div", null, "books"),
+          enumerate: () => [
+            { path: "/books/public", title: "Public" },
+            { path: "/books/draft", title: "Draft", draft: true },
+          ],
+          resolveMeta: () => ({ title: "Books" }),
+        }),
+      },
+    });
+
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+    const res = await app.request("/manifest");
+    const entries =
+      (await res.json()) as import("./types").RouteManifestEntry[];
+
+    expect(entries.map((entry) => entry.path)).toContain("/books/public");
+    expect(entries.map((entry) => entry.path)).toContain("/books/draft");
   });
 
   it("exposes site via c.var.site in handlers", async () => {

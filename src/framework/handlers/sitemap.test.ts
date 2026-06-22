@@ -83,9 +83,9 @@ describe("createSitemapApp", () => {
     expect(body).not.toContain("//</loc>");
   });
 
-  it("sets Cache-Control header", async () => {
+  it("does not set Cache-Control header by default", async () => {
     const app = makeTestApp();
     const res = await app.request("/sitemap.xml");
-    expect(res.headers.get("Cache-Control")).toBeTruthy();
+    expect(res.headers.get("Cache-Control")).toBeNull();
   });
 });

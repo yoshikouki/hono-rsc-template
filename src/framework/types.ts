@@ -67,6 +67,7 @@ export interface AppRoute<TContext = unknown> {
 export interface RouteManifestEntry {
   date?: string;
   description?: string;
+  draft?: boolean;
   path: string;
   title: string;
 }
