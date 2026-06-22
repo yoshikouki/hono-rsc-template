@@ -10,8 +10,8 @@ export interface SitemapOptions {
 export function createSitemapApp(options?: SitemapOptions): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
-  app.get("/", (c) => {
-    const manifest = c.var.routeManifest;
+  app.get("/", async (c) => {
+    const manifest = await c.var.routeManifest();
     const baseUrl = c.var.site.baseUrl.replace(TRAILING_SLASH_RE, "");
 
     const entries = options?.filter

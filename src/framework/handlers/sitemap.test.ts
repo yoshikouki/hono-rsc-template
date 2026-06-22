@@ -21,7 +21,7 @@ function makeTestApp(options?: Parameters<typeof createSitemapApp>[0]) {
   const outer = new Hono<AppEnv>();
   outer.use("*", async (c, next) => {
     c.set("site", stubSite);
-    c.set("routeManifest", stubManifest);
+    c.set("routeManifest", async () => stubManifest);
     c.set("markdownSources", new Map());
     await next();
   });
@@ -73,7 +73,7 @@ describe("createSitemapApp", () => {
     const outer = new Hono<AppEnv>();
     outer.use("*", async (c, next) => {
       c.set("site", { ...stubSite, baseUrl: "https://example.com/" });
-      c.set("routeManifest", [{ path: "/", title: "Home" }]);
+      c.set("routeManifest", async () => [{ path: "/", title: "Home" }]);
       c.set("markdownSources", new Map());
       await next();
     });

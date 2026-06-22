@@ -7,12 +7,9 @@ import type {
   Route,
   RouteGlobs,
   RouteLoader,
-  RouteManifestEntry,
-  RouteMeta,
 } from "./types";
 
 export interface Manifest<TContext = unknown> {
-  entries: RouteManifestEntry[];
   handlers: Array<{ app: Hono; path: string }>;
   markdownSources: Map<string, () => Promise<string>>;
   routes: Route<TContext>[];
@@ -32,6 +29,7 @@ const RE_TRAILING_INDEX = /(^|\/)index$/;
 const RE_LAYOUT_TSX_FILE = /(?:^|\/)layout\.tsx$/;
 
 function fileToPath(file: string): string {
+  // WIP: dynamic route segments such as [id] are intentionally not supported yet.
   const withoutPrefix = file.replace(RE_ROUTE_PREFIX, "");
   const withoutExt = withoutPrefix.replace(RE_TSX_EXT, "");
   const withoutIndex = withoutExt.replace(RE_TRAILING_INDEX, "");
@@ -89,24 +87,11 @@ export function resolveLayoutChain<TContext = unknown>(
 
 function registerRouteEntry<TContext>(
   path: string,
-  meta: RouteMeta,
   load: RouteLoader<TContext>,
   layouts: LayoutEntry<TContext>[],
-  routes: Route<TContext>[],
-  entries: RouteManifestEntry[],
-  markdownSources: Map<string, () => Promise<string>>
+  routes: Route<TContext>[]
 ): void {
-  routes.push({ path, meta, load, layouts });
-  entries.push({
-    path,
-    title: meta.title || path,
-    description: meta.description,
-    date: meta.date,
-  });
-  if (meta.markdown) {
-    const markdown = meta.markdown;
-    markdownSources.set(path, () => Promise.resolve(markdown()));
-  }
+  routes.push({ path, load, layouts });
 }
 
 export function buildManifest<TContext = unknown>(
@@ -114,7 +99,6 @@ export function buildManifest<TContext = unknown>(
   opts: BuildManifestOptions<TContext>
 ): Manifest<TContext> {
   const routes: Route<TContext>[] = [];
-  const entries: RouteManifestEntry[] = [];
   const markdownSources = new Map<string, () => Promise<string>>();
   const seen = new Map<string, string>();
 
@@ -132,15 +116,11 @@ export function buildManifest<TContext = unknown>(
     }
 
     seen.set(path, file);
-    const meta: RouteMeta = globs.metas[file] ?? { title: path };
     registerRouteEntry(
       path,
-      meta,
       load,
       resolveLayoutChain(path, globs.layouts),
-      routes,
-      entries,
-      markdownSources
+      routes
     );
   }
 
@@ -159,19 +139,16 @@ export function buildManifest<TContext = unknown>(
     seen.set(path, file);
     registerRouteEntry(
       path,
-      adapted.meta,
       adapted.load,
       resolveLayoutChain(path, globs.layouts),
-      routes,
-      entries,
-      markdownSources
+      routes
     );
     markdownSources.set(path, () => Promise.resolve(raw));
   }
 
   // programmatic routes
   for (const appRoute of opts.routes ?? []) {
-    const { path, meta, load } = appRoute;
+    const { path, load } = appRoute;
     if (seen.has(path)) {
       throw new Error(
         `Duplicate route "${path}": ${seen.get(path)} and programmatic route`
@@ -180,12 +157,9 @@ export function buildManifest<TContext = unknown>(
     seen.set(path, `programmatic:${path}`);
     registerRouteEntry(
       path,
-      meta,
       load,
       resolveLayoutChain(path, globs.layouts),
-      routes,
-      entries,
-      markdownSources
+      routes
     );
   }
 
@@ -203,5 +177,5 @@ export function buildManifest<TContext = unknown>(
     handlers.push({ path, app });
   }
 
-  return { routes, entries, markdownSources, handlers };
+  return { routes, markdownSources, handlers };
 }

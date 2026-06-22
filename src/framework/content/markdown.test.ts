@@ -55,11 +55,20 @@ describe("createMarkdownAdapter", () => {
     expect(await meta.markdown?.()).toBe(raw);
   });
 
-  it("load returns module with correct meta", async () => {
+  it("load returns module with resolveMeta", async () => {
     const adapter = createMarkdownAdapter(stubRender);
     const { load } = adapter("---\ntitle: Post\n---\nBody", "/post");
     const mod = await load();
-    expect(mod.meta?.title).toBe("Post");
+    expect(
+      await Promise.resolve(
+        mod.resolveMeta({
+          context: undefined,
+          params: {},
+          pathname: "/post",
+          request: new Request("https://example.com/post"),
+        })
+      )
+    ).toMatchObject({ title: "Post" });
   });
 
   it("load calls renderMarkdown with body", async () => {
@@ -69,7 +78,7 @@ describe("createMarkdownAdapter", () => {
     const adapter = createMarkdownAdapter(render);
     const { load } = adapter("---\ntitle: T\n---\nmy body", "/t");
     const mod = await load();
-    await mod.default();
+    await mod.default({ context: undefined, params: {} });
     expect(render).toHaveBeenCalledWith("my body");
   });
 });

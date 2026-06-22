@@ -1,3 +1,9 @@
+import type { RouteMeta } from "@/framework/types";
+
+export const resolveMeta = (): RouteMeta => ({
+  title: "Not Found",
+});
+
 export default function NotFound() {
   return (
     <main>

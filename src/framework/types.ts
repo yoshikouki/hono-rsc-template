@@ -14,14 +14,27 @@ export interface RouteMeta {
   title: string;
 }
 
-/** Public framework contract: pages may declare this to receive the request context. @public */
+export interface RouteContext<TContext = unknown> {
+  context: TContext;
+  params: Record<string, string>;
+  pathname: string;
+  request: Request;
+}
+
+/** Public framework contract: pages receive request context and route params. @public */
 export interface PageProps<TContext = unknown> {
   context: TContext;
+  params: Record<string, string>;
 }
 
 export interface RouteModule<TContext = unknown> {
   default: (props: PageProps<TContext>) => ReactElement | Promise<ReactElement>;
-  meta?: RouteMeta;
+  enumerate?: (
+    context: Pick<RouteContext<TContext>, "context" | "request">
+  ) => Promise<RouteManifestEntry[]> | RouteManifestEntry[];
+  resolveMeta: (
+    context: RouteContext<TContext>
+  ) => Promise<RouteMeta> | RouteMeta;
 }
 
 export interface LayoutModule<TContext = unknown> {
@@ -43,13 +56,11 @@ export interface LayoutEntry<TContext = unknown> {
 export interface Route<TContext = unknown> {
   layouts: LayoutEntry<TContext>[];
   load: RouteLoader<TContext>;
-  meta: RouteMeta;
   path: string;
 }
 
 export interface AppRoute<TContext = unknown> {
   load: RouteLoader<TContext>;
-  meta: RouteMeta;
   path: string;
 }
 
@@ -90,14 +101,13 @@ export interface RouteGlobs<TContext = unknown> {
   contents: Record<string, string>;
   handlers: Record<string, Hono>;
   layouts: Record<string, LayoutLoader<TContext>>;
-  metas: Record<string, RouteMeta | undefined>;
   pages: Record<string, RouteLoader<TContext>>;
 }
 
 export interface AppEnv {
   Variables: {
     markdownSources: Map<string, () => Promise<string>>;
-    routeManifest: RouteManifestEntry[];
+    routeManifest: () => Promise<RouteManifestEntry[]>;
     site: SiteConfig;
   };
 }

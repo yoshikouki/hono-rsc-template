@@ -53,12 +53,14 @@ src/
 
 ### Rendering Pipeline
 
-`route → meta → page ∘ layouts ∘ document → RSC stream → HTML`
+`route graph → load page → resolveMeta(request) → page ∘ layouts ∘ document → RSC stream → HTML`
 
 - Page URL: `/about` → HTML. RSC URL: `/__rsc/about` → `text/x-component`.
 - RSC responses are `Cache-Control: private, no-store`; route-level `cacheControl` applies to HTML responses only.
 - Initial HTML and `/__rsc/...` are separate renders. Keep initial client component output deterministic; move browser-time values into effects after hydration.
-- `manifest.ts` is a pure function (no React/Hono deps) and is unit-testable. Hono wiring is in `server.ts`
+- `manifest.ts` builds only the route graph (path + loader + layout chain). It must not eager-load page modules for metadata.
+- Page metadata is request-time via `resolveMeta()`. Site-index metadata is async via `routeManifest()` and optional page-module `enumerate()`.
+- Dynamic filename routes such as `[id]` are not implemented yet; leave the WIP marker in `manifest.ts` until the convention is designed.
 - **Server Actions are not implemented.** Use Hono RPC (`.ts` handler routes) for API calls.
 
 ## Routing Convention
@@ -75,10 +77,10 @@ src/
 ```tsx
 import type { RouteMeta } from "@/framework/types";
 
-export const meta: RouteMeta = {
+export const resolveMeta = (): RouteMeta => ({
   title: "Page Title",
   description: "Description",
-};
+});
 
 export default function Page() {
   return <main>Body only. Layout/document shell is automatic.</main>;
@@ -92,11 +94,11 @@ Place a file in `src/routes/` — no manual registration needed.
 ## Key Types (framework/types.ts)
 
 - `RouteMeta` — Page metadata (title, description, date, tags, ogImage, cacheControl, jsonLd, markdown, noindex, draft)
-- `RouteModule<TContext>` — Page module (default component + meta). The default export receives `{ context: TContext }`.
-- `PageProps<TContext>` — Props received by page/layout components when `createRequestContext` is used.
-- `AppRoute<TContext>` — Programmatic route descriptor `{ path, meta, load }` for DB/CMS-driven pages.
+- `RouteModule<TContext>` — Page module (default component + required `resolveMeta`, optional `enumerate`). The default export receives `{ context, params }`.
+- `PageProps<TContext>` — Props received by page components when `createRequestContext` is used.
+- `AppRoute<TContext>` — Programmatic route descriptor `{ path, load }` for DB/CMS-driven pages.
 - `SiteConfig<TContext>` — Site-specific config (baseUrl, name, head, formatTitle, renderMarkdown, speculationRulesPath, themeColor, htmlAttributes, etc.)
-- `AppEnv` — Hono environment variables (`markdownSources`, `routeManifest`, `site`)
+- `AppEnv` — Hono environment variables (`markdownSources`, `routeManifest()`, `site`)
 
 ## Framework Extension Points
 
@@ -109,12 +111,12 @@ createApp({
   site,
   globs: routeGlobs,
   routes: [
-    { path: "/books/123", meta: { title: "Book 123" }, load: () => import("./BookPage") },
+    { path: "/books/123", load: () => import("./BookPage") },
   ],
 });
 ```
 
-These routes are included in `routeManifest` (→ sitemap) and get the root layout chain automatically.
+The loaded module must export `resolveMeta`. These routes are included in async `routeManifest()` (→ sitemap) and get the root layout chain automatically.
 
 ### createRequestContext (request-dependent rendering)
 
@@ -141,7 +143,7 @@ export default function Page({ context }: PageProps<{ user: string }>) {
 
 ### c.var.site + manifest-driven handlers
 
-Every handler route can read `c.var.site`, `c.var.routeManifest`, and `c.var.markdownSources` via the Hono context. The sitemap handler is a built-in example:
+Every handler route can read `c.var.site`, `await c.var.routeManifest()`, and `c.var.markdownSources` via the Hono context. The sitemap handler is a built-in example:
 
 ```ts
 // src/routes/sitemap.xml.ts

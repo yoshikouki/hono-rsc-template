@@ -2,10 +2,10 @@ import { ClickCounter } from "@/components/click-counter";
 import { ClientClock } from "@/components/client-clock";
 import type { RouteMeta } from "@/framework/types";
 
-export const meta: RouteMeta = {
+export const resolveMeta = (): RouteMeta => ({
   title: "Home",
   description: "A Hono RSC template app",
-};
+});
 
 export default function HomePage() {
   return (

@@ -76,7 +76,7 @@ src/
 │   ├── content/          # Frontmatter parser, markdown adapter, response helpers
 │   ├── document.tsx      # HTML document shell
 │   ├── render.tsx        # Layout composition + RSC stream
-│   ├── server.ts         # Hono app factory + Accept negotiation
+│   ├── server.ts         # Hono app factory + /__rsc route separation
 │   ├── entry.rsc.tsx     # RSC env entry
 │   ├── entry.ssr.tsx     # SSR env entry
 │   └── entry.browser.tsx # Client env entry
@@ -103,10 +103,10 @@ Create `src/routes/my-page.tsx`:
 ```tsx
 import type { RouteMeta } from "@/framework/types";
 
-export const meta: RouteMeta = {
+export const resolveMeta = (): RouteMeta => ({
   title: "My Page",
   description: "About my page",
-};
+});
 
 export default function MyPage() {
   return <main>Hello from My Page</main>;
@@ -159,12 +159,42 @@ createApp({
   site,
   globs: routeGlobs,
   routes: [
-    { path: "/books/123", meta: { title: "Book 123" }, load: () => import("./BookPage") },
+    { path: "/books/123", load: () => import("./BookPage") },
   ],
 });
 ```
 
-These routes appear in `routeManifest` (used by the sitemap handler), inherit the root layout chain, and support `.md` auto-generation.
+The loaded page module must export `resolveMeta`. Programmatic routes appear in `routeManifest()` (used by the sitemap handler), inherit the root layout chain, and support `.md` auto-generation through `resolveMeta().markdown`.
+
+### Request-time metadata
+
+Page metadata is resolved when a page or site-index handler needs it, not during route graph construction:
+
+```tsx
+import type { RouteContext, RouteMeta } from "@/framework/types";
+
+export async function resolveMeta(
+  _ctx: RouteContext
+): Promise<RouteMeta> {
+  return {
+    title: "Book 123",
+    description: "Loaded at request time",
+    cacheControl: "public, max-age=60",
+  };
+}
+```
+
+For site-index endpoints such as sitemap or `llms.txt`, dynamic lists can be supplied by `enumerate()`:
+
+```tsx
+import type { RouteManifestEntry } from "@/framework/types";
+
+export async function enumerate(): Promise<RouteManifestEntry[]> {
+  return [{ path: "/books/123", title: "Book 123" }];
+}
+```
+
+Dynamic filename routing such as `src/routes/books/[id]/index.tsx` is not implemented yet.
 
 ### createRequestContext (per-request data)
 
@@ -186,7 +216,7 @@ export default function Page({ context }: PageProps<{ user: string }>) {
 
 ### c.var.site + manifest-driven handlers
 
-Every Hono handler route automatically has access to `c.var.site` (the `SiteConfig`), `c.var.routeManifest`, and `c.var.markdownSources`. The built-in sitemap helper demonstrates this pattern:
+Every Hono handler route automatically has access to `c.var.site` (the `SiteConfig`), `c.var.routeManifest()` and `c.var.markdownSources`. The built-in sitemap helper demonstrates this pattern:
 
 ```ts
 // src/routes/sitemap.xml.ts

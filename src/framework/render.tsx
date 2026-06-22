@@ -1,16 +1,29 @@
 import type { ReactElement } from "react";
 import { renderDocument } from "./document";
-import type { LayoutModule, Route, SiteConfig } from "./types";
+import type {
+  LayoutModule,
+  Route,
+  RouteContext,
+  RouteMeta,
+  RouteModule,
+  SiteConfig,
+} from "./types";
 
 export interface RenderRouteInput<TContext = unknown> {
   context?: TContext;
   noindex?: boolean;
   pathname: string;
-  route: Pick<Route<TContext>, "layouts" | "load" | "meta">;
+  request: Request;
+  route: Pick<Route<TContext>, "layouts" | "load">;
   site: SiteConfig<TContext>;
 }
 
 export type RenderRsc = (element: ReactElement) => Promise<ReadableStream>;
+
+export interface RenderedRoute {
+  meta: RouteMeta;
+  stream: ReadableStream;
+}
 
 export function composeWithLayouts<TContext = unknown>(
   body: ReactElement,
@@ -44,18 +57,31 @@ export function resolveJsonLd(
   return [...defaultLd, ...(meta.jsonLd ?? [])];
 }
 
+export async function resolveRouteMeta<TContext = unknown>(
+  pageModule: Pick<RouteModule<TContext>, "resolveMeta">,
+  context: RouteContext<TContext>
+): Promise<RouteMeta> {
+  return await pageModule.resolveMeta(context);
+}
+
 export async function buildDocumentElement<TContext = unknown>(
   input: RenderRouteInput<TContext>
-): Promise<ReactElement> {
+): Promise<{ element: ReactElement; meta: RouteMeta }> {
   const { site, route, pathname } = input;
   const context = input.context as TContext;
-  const meta = route.meta;
-  const title = meta.title || pathname;
 
   const [pageModule, ...layoutModules] = await Promise.all([
     route.load(),
     ...route.layouts.map(({ load }) => load()),
   ]);
+  const routeContext = {
+    context,
+    params: {},
+    pathname,
+    request: input.request,
+  };
+  const meta = await resolveRouteMeta(pageModule, routeContext);
+  const title = meta.title || pathname;
 
   const jsonLd = resolveJsonLd(
     site as SiteConfig<unknown>,
@@ -69,33 +95,36 @@ export async function buildDocumentElement<TContext = unknown>(
   );
 
   const body = composeWithLayouts(
-    await pageModule.default({ context }),
+    await pageModule.default({ context, params: routeContext.params }),
     layoutModules,
     context
   );
 
-  return renderDocument(site, {
-    context,
-    title,
-    description: meta.description,
-    pathname,
-    jsonLd,
-    noindex: input.noindex ?? meta.noindex,
-    ogImage: meta.ogImage,
-    body,
-  });
+  return {
+    element: renderDocument(site, {
+      context,
+      title,
+      description: meta.description,
+      pathname,
+      jsonLd,
+      noindex: input.noindex ?? meta.noindex,
+      ogImage: meta.ogImage,
+      body,
+    }),
+    meta,
+  };
 }
 
 export async function renderRouteToRscStream<TContext = unknown>(
   input: RenderRouteInput<TContext>,
   renderRsc?: RenderRsc
-): Promise<ReadableStream> {
-  const element = await buildDocumentElement(input);
+): Promise<RenderedRoute> {
+  const { element, meta } = await buildDocumentElement(input);
 
   if (renderRsc) {
-    return renderRsc(element);
+    return { meta, stream: await renderRsc(element) };
   }
 
   const { renderToReadableStream } = await import("@vitejs/plugin-rsc/rsc");
-  return renderToReadableStream(element);
+  return { meta, stream: await renderToReadableStream(element) };
 }

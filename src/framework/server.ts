@@ -2,12 +2,14 @@ import { Hono } from "hono";
 import { createMarkdownAdapter } from "./content/markdown";
 import { markdownResponse } from "./content/response";
 import { buildManifest, resolveLayoutChain, toMarkdownPath } from "./manifest";
-import { renderRouteToRscStream } from "./render";
+import { renderRouteToRscStream, resolveRouteMeta } from "./render";
 import type {
   AppEnv,
   AppRoute,
+  Route,
   RouteGlobs,
   RouteLoader,
+  RouteManifestEntry,
   SiteConfig,
 } from "./types";
 
@@ -88,6 +90,42 @@ function renderRscResponse(
   return new Response(rscStream, { ...init, headers });
 }
 
+async function collectRouteManifest<TContext = unknown>(
+  routes: Route<TContext>[],
+  request: Request,
+  context: TContext
+): Promise<RouteManifestEntry[]> {
+  const entries: RouteManifestEntry[] = [];
+
+  for (const route of routes) {
+    const pageModule = await route.load();
+    if (pageModule.enumerate) {
+      entries.push(...(await pageModule.enumerate({ context, request })));
+      continue;
+    }
+
+    const meta = await resolveRouteMeta(pageModule, {
+      context,
+      params: {},
+      pathname: route.path,
+      request,
+    });
+
+    if (meta.draft && import.meta.env.PROD) {
+      continue;
+    }
+
+    entries.push({
+      path: route.path,
+      title: meta.title || route.path,
+      description: meta.description,
+      date: meta.date,
+    });
+  }
+
+  return entries;
+}
+
 export function createApp<TContext = unknown>({
   site,
   globs,
@@ -119,7 +157,12 @@ export function createApp<TContext = unknown>({
   app.use("*", async (c, next) => {
     c.set("site", site as SiteConfig);
     c.set("markdownSources", manifest.markdownSources);
-    c.set("routeManifest", manifest.entries);
+    c.set("routeManifest", async () => {
+      const context = createRequestContext
+        ? await createRequestContext(c.req.raw)
+        : (undefined as TContext);
+      return collectRouteManifest(manifest.routes, c.req.raw, context);
+    });
     await next();
     if (
       site.speculationRulesPath &&
@@ -141,17 +184,17 @@ export function createApp<TContext = unknown>({
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
       const rscStream = await renderRouteToRscStream(
-        { site, route, pathname: route.path, context },
+        { site, route, pathname: route.path, request: c.req.raw, context },
         renderRsc
       );
       const response = await renderHtmlResponse(
         c.req.raw,
-        rscStream,
+        rscStream.stream,
         renderHtml
       );
 
-      if (route.meta.cacheControl) {
-        response.headers.set("Cache-Control", route.meta.cacheControl);
+      if (rscStream.meta.cacheControl) {
+        response.headers.set("Cache-Control", rscStream.meta.cacheControl);
       }
 
       return response;
@@ -162,17 +205,31 @@ export function createApp<TContext = unknown>({
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
       const rscStream = await renderRouteToRscStream(
-        { site, route, pathname: route.path, context },
+        { site, route, pathname: route.path, request: c.req.raw, context },
         renderRsc
       );
-      return renderRscResponse(rscStream);
+      return renderRscResponse(rscStream.stream);
     });
 
     // .md auto-generation
-    app.get(toMarkdownPath(route.path), async (_c) => {
+    app.get(toMarkdownPath(route.path), async (c) => {
       const getMarkdown = manifest.markdownSources.get(route.path);
       if (!getMarkdown) {
-        return new Response("Not Found", { status: 404 });
+        const context = createRequestContext
+          ? await createRequestContext(c.req.raw)
+          : (undefined as TContext);
+        const pageModule = await route.load();
+        const meta = await resolveRouteMeta(pageModule, {
+          context,
+          params: {},
+          pathname: route.path,
+          request: c.req.raw,
+        });
+        const markdown = await meta.markdown?.();
+        if (!markdown) {
+          return new Response("Not Found", { status: 404 });
+        }
+        return markdownResponse(markdown);
       }
       return markdownResponse(await getMarkdown());
     });
@@ -192,24 +249,22 @@ export function createApp<TContext = unknown>({
       const context = createRequestContext
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
-      const mod = await notFound();
       const route = {
-        meta: mod.meta ?? { title: pathname },
         load: notFound,
         layouts: resolveLayoutChain("/", globs.layouts),
       };
       const rscStream = await renderRouteToRscStream(
-        { site, route, pathname, noindex: true, context },
+        { site, route, pathname, request: c.req.raw, noindex: true, context },
         renderRsc
       );
 
       if (rscPagePath) {
-        return renderRscResponse(rscStream, { status: 404 });
+        return renderRscResponse(rscStream.stream, { status: 404 });
       }
 
       const response = await renderHtmlResponse(
         c.req.raw,
-        rscStream,
+        rscStream.stream,
         renderHtml
       );
 

@@ -25,7 +25,7 @@ export function createMarkdownAdapter(
 
     const load = async (): Promise<import("../types").RouteModule> => ({
       default: () => renderMarkdown(fm.body),
-      meta,
+      resolveMeta: () => meta,
     });
 
     return { meta, load };

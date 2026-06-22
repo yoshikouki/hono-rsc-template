@@ -1,11 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MarkdownAdapter } from "./content/markdown";
 import { buildManifest, resolveLayoutChain, toMarkdownPath } from "./manifest";
 import type { LayoutLoader, RouteMeta, RouteModule } from "./types";
 
 const RE_STUB_TITLE = /^---\ntitle: ([^\n]*)\n/;
 const RE_STUB_DRAFT = /draft: true/;
-const RE_STUB_DATE_TITLE = /^---\ntitle: ([^\n]*)\ndate: ([^\n]*)\n/;
 const RE_DUPLICATE_ROUTE = /Duplicate route/;
 const RE_DUPLICATE_HANDLER = /Duplicate handler route/;
 
@@ -22,7 +21,7 @@ const stubAdapter: MarkdownAdapter = (raw, path) => {
     meta,
     load: async () => ({
       default: () => null as unknown as React.ReactElement,
-      meta,
+      resolveMeta: () => meta,
     }),
   };
 };
@@ -33,7 +32,7 @@ const layoutLoader: LayoutLoader = async () => ({
 
 const makePageLoader = (title: string) => async (): Promise<RouteModule> => ({
   default: () => null as unknown as React.ReactElement,
-  meta: { title },
+  resolveMeta: () => ({ title }),
 });
 
 describe("toMarkdownPath", () => {
@@ -89,34 +88,22 @@ describe("resolveLayoutChain", () => {
 describe("buildManifest", () => {
   const opts = { markdownAdapter: stubAdapter };
 
-  it("builds routes from tsx pages", () => {
+  it("builds route graph from tsx pages without loading page modules", () => {
+    const load = vi.fn(makePageLoader("About"));
     const manifest = buildManifest(
       {
-        pages: { "../routes/about.tsx": makePageLoader("About") },
-        metas: { "../routes/about.tsx": { title: "About" } },
+        pages: { "../routes/about.tsx": load },
         layouts: {},
         contents: {},
         handlers: {},
       },
       opts
     );
+
     expect(manifest.routes).toHaveLength(1);
     expect(manifest.routes[0].path).toBe("/about");
-    expect(manifest.routes[0].meta.title).toBe("About");
-  });
-
-  it("falls back to path when meta is absent", () => {
-    const manifest = buildManifest(
-      {
-        pages: { "../routes/about.tsx": makePageLoader("About") },
-        metas: {},
-        layouts: {},
-        contents: {},
-        handlers: {},
-      },
-      opts
-    );
-    expect(manifest.routes[0].meta.title).toBe("/about");
+    expect(manifest.routes[0].load).toBe(load);
+    expect(load).not.toHaveBeenCalled();
   });
 
   it("throws on duplicate tsx routes", () => {
@@ -127,7 +114,6 @@ describe("buildManifest", () => {
             "../routes/about.tsx": makePageLoader("A"),
             "../routes/about/index.tsx": makePageLoader("B"),
           },
-          metas: {},
           layouts: {},
           contents: {},
           handlers: {},
@@ -137,19 +123,21 @@ describe("buildManifest", () => {
     ).toThrow(RE_DUPLICATE_ROUTE);
   });
 
-  it("builds routes from md contents", () => {
+  it("builds routes from md contents", async () => {
     const manifest = buildManifest(
       {
         pages: {},
-        metas: {},
         layouts: {},
         contents: { "../routes/hello.md": "---\ntitle: Hello\n---\nBody" },
         handlers: {},
       },
       opts
     );
+
     expect(manifest.routes[0].path).toBe("/hello");
-    expect(manifest.routes[0].meta.title).toBe("Hello");
+    await expect(manifest.routes[0].load()).resolves.toMatchObject({
+      resolveMeta: expect.any(Function),
+    });
   });
 
   it("populates markdownSources for md contents", async () => {
@@ -157,7 +145,6 @@ describe("buildManifest", () => {
     const manifest = buildManifest(
       {
         pages: {},
-        metas: {},
         layouts: {},
         contents: { "../routes/hello.md": raw },
         handlers: {},
@@ -168,32 +155,10 @@ describe("buildManifest", () => {
     expect(await manifest.markdownSources.get("/hello")?.()).toBe(raw);
   });
 
-  it("populates markdownSources for tsx pages with markdown meta", async () => {
-    const loader = async (): Promise<RouteModule> => ({
-      default: () => null as unknown as React.ReactElement,
-      meta: { title: "Page", markdown: () => "# Hello" },
-    });
-    const manifest = buildManifest(
-      {
-        pages: { "../routes/page.tsx": loader },
-        metas: {
-          "../routes/page.tsx": { title: "Page", markdown: () => "# Hello" },
-        },
-        layouts: {},
-        contents: {},
-        handlers: {},
-      },
-      opts
-    );
-    expect(manifest.markdownSources.has("/page")).toBe(true);
-    expect(await manifest.markdownSources.get("/page")?.()).toBe("# Hello");
-  });
-
   it("excludes draft content when filterDrafts is true", () => {
     const manifest = buildManifest(
       {
         pages: {},
-        metas: {},
         layouts: {},
         contents: {
           "../routes/draft.md": "---\ntitle: Draft\ndraft: true\n---\nBody",
@@ -209,7 +174,6 @@ describe("buildManifest", () => {
     const manifest = buildManifest(
       {
         pages: {},
-        metas: {},
         layouts: {},
         contents: {
           "../routes/draft.md": "---\ntitle: Draft\ndraft: true\n---\nBody",
@@ -225,7 +189,6 @@ describe("buildManifest", () => {
     const manifest = buildManifest(
       {
         pages: { "../routes/hello.tsx": makePageLoader("TSX Hello") },
-        metas: { "../routes/hello.tsx": { title: "TSX Hello" } },
         layouts: {},
         contents: { "../routes/hello.md": "---\ntitle: MD Hello\n---\nBody" },
         handlers: {},
@@ -233,14 +196,14 @@ describe("buildManifest", () => {
       opts
     );
     expect(manifest.routes).toHaveLength(1);
-    expect(manifest.routes[0].meta.title).toBe("TSX Hello");
+    expect(manifest.routes[0].path).toBe("/hello");
+    expect(manifest.markdownSources.has("/hello")).toBe(false);
   });
 
   it("stores resolved layout chain with routes", () => {
     const manifest = buildManifest(
       {
         pages: { "../routes/about/career.tsx": makePageLoader("Career") },
-        metas: { "../routes/about/career.tsx": { title: "Career" } },
         layouts: {
           "../routes/layout.tsx": layoutLoader,
           "../routes/about/layout.tsx": layoutLoader,
@@ -257,43 +220,12 @@ describe("buildManifest", () => {
     ]);
   });
 
-  it("records date in entries", () => {
-    const manifest = buildManifest(
-      {
-        pages: {},
-        metas: {},
-        layouts: {},
-        contents: {
-          "../routes/post.md": "---\ntitle: Post\ndate: 2025-03-20\n---\nBody",
-        },
-        handlers: {},
-      },
-      {
-        markdownAdapter: (raw, path) => {
-          const fm = raw.match(RE_STUB_DATE_TITLE);
-          const title = fm?.[1]?.trim() || path;
-          const date = fm?.[2]?.trim();
-          const meta: RouteMeta = { title, date, markdown: () => raw };
-          return {
-            meta,
-            load: async () => ({
-              default: () => null as unknown as React.ReactElement,
-              meta,
-            }),
-          };
-        },
-      }
-    );
-    expect(manifest.entries[0].date).toBe("2025-03-20");
-  });
-
   it("throws on duplicate handler routes", () => {
     const fakeApp = {} as import("hono").Hono;
     expect(() =>
       buildManifest(
         {
           pages: {},
-          metas: {},
           layouts: {},
           contents: {},
           handlers: {
@@ -311,7 +243,6 @@ describe("buildManifest", () => {
     const manifest = buildManifest(
       {
         pages: {},
-        metas: {},
         layouts: {},
         contents: {},
         handlers: { "../routes/healthz.ts": fakeApp },
@@ -323,20 +254,18 @@ describe("buildManifest", () => {
   });
 
   describe("programmatic routes (opts.routes)", () => {
-    it("adds programmatic routes to entries and routes", () => {
+    it("adds programmatic routes to the route graph", () => {
       const load = makePageLoader("Book Detail");
       const manifest = buildManifest(
-        { pages: {}, metas: {}, layouts: {}, contents: {}, handlers: {} },
+        { pages: {}, layouts: {}, contents: {}, handlers: {} },
         {
           ...opts,
-          routes: [{ path: "/books/123", meta: { title: "Book 123" }, load }],
+          routes: [{ path: "/books/123", load }],
         }
       );
       expect(manifest.routes).toHaveLength(1);
       expect(manifest.routes[0].path).toBe("/books/123");
-      expect(manifest.routes[0].meta.title).toBe("Book 123");
-      expect(manifest.entries).toHaveLength(1);
-      expect(manifest.entries[0].path).toBe("/books/123");
+      expect(manifest.routes[0].load).toBe(load);
     });
 
     it("throws on duplicate between glob and programmatic route", () => {
@@ -345,14 +274,13 @@ describe("buildManifest", () => {
         buildManifest(
           {
             pages: { "../routes/about.tsx": makePageLoader("About") },
-            metas: {},
             layouts: {},
             contents: {},
             handlers: {},
           },
           {
             ...opts,
-            routes: [{ path: "/about", meta: { title: "About dup" }, load }],
+            routes: [{ path: "/about", load }],
           }
         )
       ).toThrow(RE_DUPLICATE_ROUTE);
@@ -363,40 +291,18 @@ describe("buildManifest", () => {
       const manifest = buildManifest(
         {
           pages: {},
-          metas: {},
           layouts: { "../routes/layout.tsx": layoutLoader },
           contents: {},
           handlers: {},
         },
         {
           ...opts,
-          routes: [{ path: "/books/123", meta: { title: "Book 123" }, load }],
+          routes: [{ path: "/books/123", load }],
         }
       );
       expect(manifest.routes[0].layouts.map((l) => l.file)).toEqual([
         "../routes/layout.tsx",
       ]);
-    });
-
-    it("registers markdownSources for programmatic route with markdown meta", async () => {
-      const load = makePageLoader("Page");
-      const manifest = buildManifest(
-        { pages: {}, metas: {}, layouts: {}, contents: {}, handlers: {} },
-        {
-          ...opts,
-          routes: [
-            {
-              path: "/books/123",
-              meta: { title: "Book 123", markdown: () => "# Hello" },
-              load,
-            },
-          ],
-        }
-      );
-      expect(manifest.markdownSources.has("/books/123")).toBe(true);
-      expect(await manifest.markdownSources.get("/books/123")?.()).toBe(
-        "# Hello"
-      );
     });
   });
 });

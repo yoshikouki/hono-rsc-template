@@ -37,13 +37,12 @@ const layoutLoader: LayoutLoader = async () => ({
 function makePageLoader(title: string, extra: Partial<RouteMeta> = {}) {
   return async (): Promise<RouteModule> => ({
     default: () => createElement("div", null, title),
-    meta: { title, ...extra },
+    resolveMeta: () => ({ title, ...extra }),
   });
 }
 
 function makeGlobs(overrides: Partial<RouteGlobs> = {}): RouteGlobs {
   return {
-    metas: { "./routes/index.tsx": { title: "Home" } },
     pages: { "./routes/index.tsx": makePageLoader("Home") },
     layouts: { "./routes/layout.tsx": layoutLoader },
     contents: {},
@@ -156,12 +155,6 @@ describe("createApp", () => {
 
   it("sets Cache-Control when route has cacheControl meta", async () => {
     const globs = makeGlobs({
-      metas: {
-        "./routes/index.tsx": {
-          title: "Home",
-          cacheControl: "public, max-age=3600",
-        },
-      },
       pages: {
         "./routes/index.tsx": makePageLoader("Home", {
           cacheControl: "public, max-age=3600",
@@ -175,12 +168,6 @@ describe("createApp", () => {
 
   it("does not apply route cacheControl to RSC responses", async () => {
     const globs = makeGlobs({
-      metas: {
-        "./routes/index.tsx": {
-          title: "Home",
-          cacheControl: "public, max-age=3600",
-        },
-      },
       pages: {
         "./routes/index.tsx": makePageLoader("Home", {
           cacheControl: "public, max-age=3600",
@@ -194,9 +181,6 @@ describe("createApp", () => {
 
   it("returns markdown for .md route", async () => {
     const globs = makeGlobs({
-      metas: {
-        "./routes/index.tsx": { title: "Home", markdown: () => "# Home" },
-      },
       pages: {
         "./routes/index.tsx": makePageLoader("Home", {
           markdown: () => "# Home",
@@ -312,7 +296,7 @@ describe("createApp", () => {
     const inner = createApp({ site: baseSite, globs, renderer: stubRenderer });
     outer.use("*", async (c, next) => {
       await next();
-      capturedManifest = c.var.routeManifest;
+      capturedManifest = await c.var.routeManifest();
       capturedSources = c.var.markdownSources;
     });
     outer.route("/", inner);
@@ -353,7 +337,7 @@ describe("createApp", () => {
           capturedContext = props.context;
           return createElement("div", null, "ok");
         },
-        meta: { title: "Home" },
+        resolveMeta: () => ({ title: "Home" }),
       });
       const app2 = createApp<TestCtx>({
         site: baseSite,
@@ -362,6 +346,45 @@ describe("createApp", () => {
         createRequestContext: async (_req) => ({ user: "alice" }),
       });
       await app2.request("/");
+      expect(capturedContext).toEqual({ user: "alice" });
+    });
+
+    it("passes context to routeManifest metadata resolution", async () => {
+      interface TestCtx {
+        user: string;
+      }
+
+      let capturedContext: TestCtx | undefined;
+      const { Hono } = await import("hono");
+      const handler = new Hono<import("./types").AppEnv>();
+      handler.get("/", async (c) => {
+        const entries = await c.var.routeManifest();
+        return c.json(entries);
+      });
+
+      const globs = makeGlobs({
+        handlers: { "./routes/manifest.ts": handler },
+        pages: {
+          "./routes/index.tsx": async (): Promise<RouteModule<TestCtx>> => ({
+            default: () => createElement("div", null, "ok"),
+            resolveMeta: ({ context }) => {
+              capturedContext = context;
+              return { title: context.user };
+            },
+          }),
+        },
+      }) as RouteGlobs<TestCtx>;
+
+      const app2 = createApp<TestCtx>({
+        site: baseSite,
+        globs,
+        renderer: stubRenderer,
+        createRequestContext: async () => ({ user: "alice" }),
+      });
+
+      const res = await app2.request("/manifest");
+      await res.json();
+
       expect(capturedContext).toEqual({ user: "alice" });
     });
   });
@@ -394,7 +417,6 @@ describe("createApp", () => {
         site: baseSite,
         globs: makeGlobs({
           pages: { "./routes/about.tsx": makePageLoader("About") },
-          metas: { "./routes/about.tsx": { title: "About" } },
         }),
         renderer: stubRenderer,
       });
@@ -408,8 +430,8 @@ describe("createApp", () => {
       const load = makePageLoader("Book Detail");
       const app = createApp({
         site: baseSite,
-        globs: makeGlobs({ pages: {}, metas: {} }),
-        routes: [{ path: "/books/123", meta: { title: "Book 123" }, load }],
+        globs: makeGlobs({ pages: {} }),
+        routes: [{ path: "/books/123", load }],
         renderer: stubRenderer,
       });
       const res = await app.request("/books/123");
@@ -420,17 +442,17 @@ describe("createApp", () => {
       let capturedManifest: import("./types").RouteManifestEntry[] | undefined;
       const { Hono } = await import("hono");
       const load = makePageLoader("Book");
-      const globs = makeGlobs({ pages: {}, metas: {} });
+      const globs = makeGlobs({ pages: {} });
       const inner = createApp({
         site: baseSite,
         globs,
-        routes: [{ path: "/books/1", meta: { title: "Book 1" }, load }],
+        routes: [{ path: "/books/1", load }],
         renderer: stubRenderer,
       });
       const outer = new Hono<import("./types").AppEnv>();
       outer.use("*", async (c, next) => {
         await next();
-        capturedManifest = c.var.routeManifest;
+        capturedManifest = await c.var.routeManifest();
       });
       outer.route("/", inner);
       await outer.request("/books/1");

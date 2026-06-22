@@ -22,10 +22,6 @@ export const site: SiteConfig = {
 };
 
 export const routeGlobs: RouteGlobs = {
-  metas: import.meta.glob<import("./framework/types").RouteMeta | undefined>(
-    ["./routes/**/*.tsx", "!./routes/**/layout.tsx"],
-    { eager: true, import: "meta" }
-  ),
   pages: import.meta.glob<import("./framework/types").RouteModule>([
     "./routes/**/*.tsx",
     "!./routes/**/layout.tsx",

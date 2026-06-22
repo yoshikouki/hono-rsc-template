@@ -5,23 +5,30 @@ import {
   composeWithLayouts,
   renderRouteToRscStream,
   resolveJsonLd,
+  resolveRouteMeta,
 } from "./render";
-import type { LayoutModule, Route, SiteConfig } from "./types";
+import type { LayoutModule, Route, RouteMeta, SiteConfig } from "./types";
 
 const baseSite: SiteConfig = {
   baseUrl: "https://example.com",
   name: "Test",
 };
 
+const request = new Request("https://example.com/");
+
 const makeRoute = (
-  overrides: Partial<Pick<Route, "layouts" | "load" | "meta">> = {}
-): Pick<Route, "layouts" | "load" | "meta"> => ({
-  meta: { title: "Page" },
+  overrides: Partial<Pick<Route, "layouts" | "load">> & {
+    meta?: RouteMeta;
+  } = {}
+): Pick<Route, "layouts" | "load"> => ({
   load: async () => ({
     default: () => createElement("div", null, "body"),
+    resolveMeta: () => overrides.meta ?? { title: "Page" },
   }),
   layouts: [],
-  ...overrides,
+  ...Object.fromEntries(
+    Object.entries(overrides).filter(([key]) => key !== "meta")
+  ),
 });
 
 describe("composeWithLayouts", () => {
@@ -96,43 +103,67 @@ describe("resolveJsonLd", () => {
   });
 });
 
+describe("resolveRouteMeta", () => {
+  it("calls the route module resolveMeta function", async () => {
+    const resolveMetaSpy = vi.fn(() => ({ title: "Resolved" }));
+    const meta = await resolveRouteMeta(
+      { resolveMeta: resolveMetaSpy },
+      {
+        context: undefined,
+        params: {},
+        pathname: "/resolved",
+        request,
+      }
+    );
+    expect(meta.title).toBe("Resolved");
+    expect(resolveMetaSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: "/resolved", params: {} })
+    );
+  });
+});
+
 describe("buildDocumentElement", () => {
   it("returns a ReactElement", async () => {
-    const el = await buildDocumentElement({
+    const { element } = await buildDocumentElement({
       site: baseSite,
       route: makeRoute(),
       pathname: "/",
+      request,
     });
-    expect(el).toBeDefined();
-    expect(typeof el).toBe("object");
+    expect(element).toBeDefined();
+    expect(typeof element).toBe("object");
   });
 
   it("falls back to pathname when meta title is empty", async () => {
-    const el = await buildDocumentElement({
+    const { element, meta } = await buildDocumentElement({
       site: baseSite,
       route: makeRoute({ meta: { title: "" } }),
       pathname: "/fallback",
+      request,
     });
-    expect(el).toBeDefined();
+    expect(element).toBeDefined();
+    expect(meta.title).toBe("");
   });
 
   it("applies noindex from input override", async () => {
-    const el = await buildDocumentElement({
+    const { element } = await buildDocumentElement({
       site: baseSite,
       route: makeRoute({ meta: { title: "Page", noindex: false } }),
       pathname: "/",
+      request,
       noindex: true,
     });
-    expect(el).toBeDefined();
+    expect(element).toBeDefined();
   });
 
   it("applies noindex from meta when input override is absent", async () => {
-    const el = await buildDocumentElement({
+    const { element } = await buildDocumentElement({
       site: baseSite,
       route: makeRoute({ meta: { title: "Page", noindex: true } }),
       pathname: "/",
+      request,
     });
-    expect(el).toBeDefined();
+    expect(element).toBeDefined();
   });
 
   it("calls defaultJsonLd with route meta", async () => {
@@ -141,6 +172,7 @@ describe("buildDocumentElement", () => {
       site: { ...baseSite, defaultJsonLd: spy },
       route: makeRoute({ meta: { title: "Post", date: "2025-01-01" } }),
       pathname: "/post",
+      request,
     });
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -160,7 +192,12 @@ describe("buildDocumentElement", () => {
         { file: "layout.tsx", load: async () => ({ default: layoutSpy }) },
       ],
     });
-    await buildDocumentElement({ site: baseSite, route, pathname: "/" });
+    await buildDocumentElement({
+      site: baseSite,
+      route,
+      pathname: "/",
+      request,
+    });
     expect(layoutSpy).toHaveBeenCalled();
   });
 });
@@ -170,11 +207,12 @@ describe("renderRouteToRscStream", () => {
     const stream = new ReadableStream();
     const renderRsc = vi.fn(async () => stream);
     const result = await renderRouteToRscStream(
-      { site: baseSite, route: makeRoute(), pathname: "/" },
+      { site: baseSite, route: makeRoute(), pathname: "/", request },
       renderRsc
     );
     expect(renderRsc).toHaveBeenCalledOnce();
-    expect(result).toBe(stream);
+    expect(result.stream).toBe(stream);
+    expect(result.meta.title).toBe("Page");
   });
 
   it("passes ReactElement to renderRsc", async () => {
@@ -184,7 +222,7 @@ describe("renderRouteToRscStream", () => {
       return Promise.resolve(new ReadableStream());
     });
     await renderRouteToRscStream(
-      { site: baseSite, route: makeRoute(), pathname: "/" },
+      { site: baseSite, route: makeRoute(), pathname: "/", request },
       renderRsc
     );
     expect(capturedEl).toBeDefined();

@@ -1,9 +1,9 @@
 import type { RouteMeta } from "@/framework/types";
 
-export const meta: RouteMeta = {
+export const resolveMeta = (): RouteMeta => ({
   title: "About",
   description: "About this template",
-};
+});
 
 export default function AboutPage() {
   return (
