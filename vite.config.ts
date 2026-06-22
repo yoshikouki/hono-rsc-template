@@ -32,6 +32,19 @@ export default defineConfig(({ mode }) => ({
       build: {
         rollupOptions: {
           input: { index: "./src/framework/entry.rsc.tsx" },
+          output: {
+            manualChunks(id) {
+              // Keep the React/RSC runtime in a shared chunk so page route
+              // dynamic imports stay effective without Rollup warnings.
+              if (
+                id.includes("/node_modules/react/") ||
+                id.includes("/node_modules/react-dom/") ||
+                id.includes("/node_modules/@vitejs/plugin-rsc/dist/vendor/")
+              ) {
+                return "rsc-react-server";
+              }
+            },
+          },
         },
       },
     },
