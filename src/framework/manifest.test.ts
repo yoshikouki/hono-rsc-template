@@ -309,19 +309,18 @@ describe("buildManifest", () => {
     expect(manifest.routes).toHaveLength(1);
   });
 
-  it("tsx wins over md on same path (md skipped)", () => {
-    const manifest = buildManifest(
-      {
-        pages: { "../routes/hello.tsx": makePageLoader("TSX Hello") },
-        layouts: {},
-        contents: { "../routes/hello.md": "---\ntitle: MD Hello\n---\nBody" },
-        handlers: {},
-      },
-      opts
-    );
-    expect(manifest.routes).toHaveLength(1);
-    expect(manifest.routes[0].path).toBe("/hello");
-    expect(manifest.markdownSources.has("/hello")).toBe(false);
+  it("throws on duplicate tsx and markdown content routes", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/hello.tsx": makePageLoader("TSX Hello") },
+          layouts: {},
+          contents: { "../routes/hello.md": "---\ntitle: MD Hello\n---\nBody" },
+          handlers: {},
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
   });
 
   it("stores resolved layout chain with routes", () => {
@@ -614,20 +613,24 @@ describe("buildManifest", () => {
     ).toThrow(RE_DUPLICATE_ROUTE);
   });
 
-  it("throws when a dynamic page route overlaps a static markdown route", () => {
-    expect(() =>
-      buildManifest(
-        {
-          pages: { "../routes/users/[id].tsx": makePageLoader("User") },
-          layouts: {},
-          contents: {
-            "../routes/users/settings.md": "---\ntitle: Settings\n---\nBody",
-          },
-          handlers: {},
+  it("allows static markdown siblings before dynamic page routes", () => {
+    const manifest = buildManifest(
+      {
+        pages: { "../routes/users/[id].tsx": makePageLoader("User") },
+        layouts: {},
+        contents: {
+          "../routes/users/settings.md": "---\ntitle: Settings\n---\nBody",
         },
-        opts
-      )
-    ).toThrow(RE_DUPLICATE_ROUTE);
+        handlers: {},
+      },
+      opts
+    );
+
+    expect(manifest.routes.map((route) => route.path)).toEqual([
+      "/users/settings",
+      "/users/:id",
+    ]);
+    expect(manifest.markdownSources.has("/users/settings")).toBe(true);
   });
 
   it("allows unrelated page and handler routes", () => {

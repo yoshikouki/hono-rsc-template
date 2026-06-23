@@ -398,16 +398,8 @@ export function buildManifest<TContext = unknown>(
     const path = contentFileToPath(file);
     const shape = routePathToShape(path);
     if (seen.has(shape)) {
-      continue;
-    }
-
-    const overlappingRoute = findOverlappingRoute(
-      path,
-      registeredPageLikeRoutes
-    );
-    if (overlappingRoute) {
       throw new Error(
-        `Duplicate route "${path}": ${overlappingRoute.source} and ${file}`
+        `Duplicate route "${path}": ${seen.get(shape)} and ${file}`
       );
     }
 
