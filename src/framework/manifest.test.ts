@@ -727,6 +727,111 @@ describe("buildManifest", () => {
     ]);
   });
 
+  it("throws when a page overlaps another page generated markdown route", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: {
+            "../routes/about.tsx": makePageLoader("About"),
+            "../routes/about.md.tsx": makePageLoader("About Markdown"),
+          },
+          layouts: {},
+          contents: {},
+          handlers: {},
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a programmatic route overlaps a generated markdown route", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/about.tsx": makePageLoader("About") },
+          layouts: {},
+          contents: {},
+          handlers: {},
+        },
+        {
+          ...opts,
+          routes: [
+            { path: "/about.md", load: makePageLoader("About Markdown") },
+          ],
+        }
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a page overlaps another page generated RSC route", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: {
+            "../routes/about.tsx": makePageLoader("About"),
+            "../routes/__rsc/about.tsx": makePageLoader("About RSC"),
+          },
+          layouts: {},
+          contents: {},
+          handlers: {},
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a dynamic page generated RSC route overlaps a static page", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: {
+            "../routes/users/[id].tsx": makePageLoader("User"),
+            "../routes/__rsc/users/settings.tsx":
+              makePageLoader("Settings RSC"),
+          },
+          layouts: {},
+          contents: {},
+          handlers: {},
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when static markdown content generates a route that overlaps a page", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/hello.md.tsx": makePageLoader("Hello MD") },
+          layouts: {},
+          contents: { "../routes/hello.md": "---\ntitle: Hello\n---\nBody" },
+          handlers: {},
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("allows unrelated page-like routes with generated routes", () => {
+    const manifest = buildManifest(
+      {
+        pages: {
+          "../routes/about.tsx": makePageLoader("About"),
+          "../routes/api/about.md.tsx": makePageLoader("API About Markdown"),
+        },
+        layouts: {},
+        contents: {},
+        handlers: {},
+      },
+      opts
+    );
+
+    expect(manifest.routes.map((route) => route.path)).toEqual([
+      "/api/about.md",
+      "/about",
+    ]);
+  });
+
   it("throws when markdown content uses dynamic route syntax", () => {
     expect(() =>
       buildManifest(

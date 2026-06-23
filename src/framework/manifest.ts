@@ -41,6 +41,7 @@ interface RoutePathEntry {
 
 interface RegisteredRoutePath {
   generated?: boolean;
+  ownerPath: string;
   path: string;
   source: string;
 }
@@ -249,19 +250,78 @@ function findOverlappingRoute(
   return registered.find((entry) => routePathsOverlap(path, entry.path));
 }
 
-function registerPageLikeRoutePath(
+function pageLikeRoutePathEntries(
+  path: string,
+  source: string
+): RegisteredRoutePath[] {
+  return [
+    { ownerPath: path, path, source },
+    ...generatedRoutePathsForRoute(path).map((generatedPath) => ({
+      generated: true,
+      ownerPath: path,
+      path: generatedPath,
+      source: `${source} generated route ${generatedPath}`,
+    })),
+  ];
+}
+
+function findGeneratedCollision(
+  candidates: RegisteredRoutePath[],
+  registered: RegisteredRoutePath[]
+): { candidate: RegisteredRoutePath; existing: RegisteredRoutePath } | null {
+  for (const candidate of candidates) {
+    for (const existing of registered) {
+      if (generatedRoutesConflict(candidate, existing)) {
+        return { candidate, existing };
+      }
+    }
+  }
+
+  return null;
+}
+
+function isRscRoute(path: string): boolean {
+  return path === RSC_ROUTE_PREFIX || path.startsWith(`${RSC_ROUTE_PREFIX}/`);
+}
+
+function generatedRoutesConflict(
+  a: RegisteredRoutePath,
+  b: RegisteredRoutePath
+): boolean {
+  if (!((a.generated || b.generated) && routePathsOverlap(a.path, b.path))) {
+    return false;
+  }
+
+  if (
+    a.generated &&
+    b.generated &&
+    routePathsOverlap(a.ownerPath, b.ownerPath) &&
+    !(isRscRoute(a.ownerPath) || isRscRoute(b.ownerPath))
+  ) {
+    return false;
+  }
+
+  if (isRscRoute(a.path) || isRscRoute(b.path)) {
+    return true;
+  }
+
+  return a.path === b.path;
+}
+
+function assertNoGeneratedCollision(
   path: string,
   source: string,
   registered: RegisteredRoutePath[]
-): void {
-  registered.push({ path, source });
-  for (const generatedPath of generatedRoutePathsForRoute(path)) {
-    registered.push({
-      generated: true,
-      path: generatedPath,
-      source: `${source} generated route ${generatedPath}`,
-    });
+): RegisteredRoutePath[] {
+  const candidates = pageLikeRoutePathEntries(path, source);
+  const collision = findGeneratedCollision(candidates, registered);
+  if (collision) {
+    throw new Error(
+      `Duplicate route "${collision.candidate.path}": ${collision.existing.source} and ${source}`
+    );
   }
+
+  return candidates;
 }
 
 function buildHandlerEntries(
@@ -318,8 +378,13 @@ export function buildManifest<TContext = unknown>(
       );
     }
 
+    const routePathEntries = assertNoGeneratedCollision(
+      path,
+      file,
+      registeredPageLikeRoutes
+    );
     seen.set(shape, file);
-    registerPageLikeRoutePath(path, file, registeredPageLikeRoutes);
+    registeredPageLikeRoutes.push(...routePathEntries);
     registerRouteEntry(
       path,
       load,
@@ -351,8 +416,13 @@ export function buildManifest<TContext = unknown>(
       continue;
     }
 
+    const routePathEntries = assertNoGeneratedCollision(
+      path,
+      file,
+      registeredPageLikeRoutes
+    );
     seen.set(shape, file);
-    registerPageLikeRoutePath(path, file, registeredPageLikeRoutes);
+    registeredPageLikeRoutes.push(...routePathEntries);
     registerRouteEntry(
       path,
       adapted.load,
@@ -372,8 +442,13 @@ export function buildManifest<TContext = unknown>(
       );
     }
     const source = `programmatic:${path}`;
+    const routePathEntries = assertNoGeneratedCollision(
+      path,
+      source,
+      registeredPageLikeRoutes
+    );
     seen.set(shape, source);
-    registerPageLikeRoutePath(path, source, registeredPageLikeRoutes);
+    registeredPageLikeRoutes.push(...routePathEntries);
     registerRouteEntry(
       path,
       load,
