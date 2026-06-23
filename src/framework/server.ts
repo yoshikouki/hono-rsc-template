@@ -22,6 +22,7 @@ const RSC_CONTENT_TYPE = "text/x-component;charset=utf-8";
 const HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 const RSC_CACHE_CONTROL = "private, no-store";
 const RSC_ROUTE_PREFIX = "/__rsc";
+const RE_HONO_PARAM_NAME = /^[A-Za-z_$][\w$]*/;
 
 export function rscPathFor(path: string): string {
   return path === "/" ? RSC_ROUTE_PREFIX : `${RSC_ROUTE_PREFIX}${path}`;
@@ -39,9 +40,33 @@ export function pagePathFromRscPath(pathname: string): string | null {
   return pathname.slice(RSC_ROUTE_PREFIX.length);
 }
 
-function pagePathnameForRequest(request: Request): string {
-  const pathname = new URL(request.url).pathname;
-  return pagePathFromRscPath(pathname) ?? pathname;
+function routeParamName(segment: string): string | null {
+  if (!segment.startsWith(":")) {
+    return null;
+  }
+
+  return segment.slice(1).match(RE_HONO_PARAM_NAME)?.[0] ?? null;
+}
+
+export function pathnameFromRoutePath(
+  routePath: string,
+  params: Record<string, string>
+): string {
+  const segments = routePath
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => {
+      const paramName = routeParamName(segment);
+      if (!paramName) {
+        return segment;
+      }
+
+      return Object.hasOwn(params, paramName)
+        ? encodeURIComponent(params[paramName])
+        : segment;
+    });
+
+  return segments.length > 0 ? `/${segments.join("/")}` : "/";
 }
 
 type RenderRsc = Parameters<typeof renderRouteToRscStream>[1];
@@ -209,11 +234,12 @@ export function createApp<TContext = unknown>({
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
       const params = c.req.param();
+      const pathname = pathnameFromRoutePath(route.path, params);
       const rscStream = await renderRouteToRscStream(
         {
           site,
           route,
-          pathname: pagePathnameForRequest(c.req.raw),
+          pathname,
           request: c.req.raw,
           context,
           params,
@@ -238,11 +264,12 @@ export function createApp<TContext = unknown>({
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
       const params = c.req.param();
+      const pathname = pathnameFromRoutePath(route.path, params);
       const rscStream = await renderRouteToRscStream(
         {
           site,
           route,
-          pathname: pagePathnameForRequest(c.req.raw),
+          pathname,
           request: c.req.raw,
           context,
           params,
@@ -264,7 +291,7 @@ export function createApp<TContext = unknown>({
           const meta = await resolveRouteMeta(pageModule, {
             context,
             params: {},
-            pathname: pagePathnameForRequest(c.req.raw),
+            pathname: pathnameFromRoutePath(route.path, {}),
             request: c.req.raw,
           });
           const markdown = await meta.markdown?.();

@@ -469,6 +469,51 @@ describe("buildManifest", () => {
     ]);
   });
 
+  it("throws on duplicate static page and handler route shapes", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/users/settings.tsx": makePageLoader("Settings") },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/users/settings.ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws on duplicate dynamic page and handler route shapes", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/users/[id].tsx": makePageLoader("User") },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/users/[id].ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws on duplicate page and handler route shapes with different param names", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/users/[id].tsx": makePageLoader("User") },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/users/[name].ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
   it("throws when markdown content uses dynamic route syntax", () => {
     expect(() =>
       buildManifest(

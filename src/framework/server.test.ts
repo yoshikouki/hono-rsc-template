@@ -4,6 +4,7 @@ import {
   createApp,
   includeRouteManifestEntry,
   pagePathFromRscPath,
+  pathnameFromRoutePath,
   rscPathFor,
 } from "./server";
 import type {
@@ -78,6 +79,21 @@ describe("pagePathFromRscPath", () => {
 
   it("returns null for normal page paths", () => {
     expect(pagePathFromRscPath("/about")).toBeNull();
+  });
+});
+
+describe("pathnameFromRoutePath", () => {
+  it("returns the canonical static route path", () => {
+    expect(pathnameFromRoutePath("/about", {})).toBe("/about");
+  });
+
+  it("fills dynamic route params", () => {
+    expect(
+      pathnameFromRoutePath("/app/parties/:partyId/events/:eventId", {
+        partyId: "p1",
+        eventId: "e2",
+      })
+    ).toBe("/app/parties/p1/events/e2");
   });
 });
 
@@ -290,6 +306,31 @@ describe("createApp", () => {
       "/app/parties/p1/events/e2",
       "/app/parties/p1/events/e2",
     ]);
+  });
+
+  it("passes canonical pathnames to HTML, RSC, and markdown metadata", async () => {
+    const pathnames: string[] = [];
+    const globs = makeGlobs({
+      pages: {
+        "./routes/about.tsx": async (): Promise<RouteModule> => ({
+          default: () => createElement("div", null, "about"),
+          resolveMeta: ({ pathname }) => {
+            pathnames.push(pathname);
+            return { title: "About", markdown: () => "# About" };
+          },
+        }),
+      },
+    });
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+
+    const htmlRes = await app.request("/about/");
+    const rscRes = await app.request("/__rsc/about/");
+    const markdownRes = await app.request("/about.md");
+
+    expect(htmlRes.status).toBe(200);
+    expect(rscRes.status).toBe(200);
+    expect(markdownRes.status).toBe(200);
+    expect(pathnames).toEqual(["/about", "/about", "/about"]);
   });
 
   it("routes dynamic handler paths", async () => {

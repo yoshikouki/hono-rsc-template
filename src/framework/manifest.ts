@@ -278,6 +278,11 @@ export function buildManifest<TContext = unknown>(
   for (const [file, app] of Object.entries(globs.handlers)) {
     const path = handlerFileToPath(file);
     const shape = routePathToShape(path);
+    if (seen.has(shape)) {
+      throw new Error(
+        `Duplicate route "${path}": ${seen.get(shape)} and ${file}`
+      );
+    }
     if (handlerSeen.has(shape)) {
       throw new Error(
         `Duplicate handler route "${path}": ${handlerSeen.get(shape)} and ${file}`
