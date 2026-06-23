@@ -38,6 +38,11 @@ interface RoutePathEntry {
   path: string;
 }
 
+interface RegisteredRoutePath {
+  path: string;
+  source: string;
+}
+
 function stripRoutePrefix(file: string): string {
   return file.replace(RE_ROUTE_PREFIX, "");
 }
@@ -83,14 +88,37 @@ export function routePathToShape(path: string): string {
   return segments.length > 0 ? `/${segments.join("/")}` : "/";
 }
 
+function pathSegments(path: string): string[] {
+  return path.split("/").filter(Boolean);
+}
+
+function isDynamicSegment(segment: string): boolean {
+  return segment.startsWith(":");
+}
+
+export function routePathsOverlap(a: string, b: string): boolean {
+  const aSegments = pathSegments(a);
+  const bSegments = pathSegments(b);
+  if (aSegments.length !== bSegments.length) {
+    return false;
+  }
+
+  return aSegments.every((segment, index) => {
+    const other = bSegments[index];
+    return (
+      segment === other || isDynamicSegment(segment) || isDynamicSegment(other)
+    );
+  });
+}
+
 function compareRouteSpecificity(a: string, b: string): number {
-  const aSegments = a.split("/").filter(Boolean);
-  const bSegments = b.split("/").filter(Boolean);
+  const aSegments = pathSegments(a);
+  const bSegments = pathSegments(b);
   const length = Math.min(aSegments.length, bSegments.length);
 
   for (let i = 0; i < length; i += 1) {
-    const aDynamic = aSegments[i].startsWith(":");
-    const bDynamic = bSegments[i].startsWith(":");
+    const aDynamic = isDynamicSegment(aSegments[i]);
+    const bDynamic = isDynamicSegment(bSegments[i]);
     if (aDynamic !== bDynamic) {
       return aDynamic ? 1 : -1;
     }
@@ -200,6 +228,44 @@ function registerRouteEntry<TContext>(
   routes.push({ path, load, layouts });
 }
 
+function findOverlappingRoute(
+  path: string,
+  registered: RegisteredRoutePath[]
+): RegisteredRoutePath | undefined {
+  return registered.find((entry) => routePathsOverlap(path, entry.path));
+}
+
+function buildHandlerEntries(
+  globHandlers: RouteGlobs["handlers"],
+  registeredPageLikeRoutes: RegisteredRoutePath[]
+): Array<{ app: Hono; path: string }> {
+  const handlerSeen = new Map<string, string>();
+  const handlers: Array<{ app: Hono; path: string }> = [];
+
+  for (const [file, app] of Object.entries(globHandlers)) {
+    const path = handlerFileToPath(file);
+    const shape = routePathToShape(path);
+    const overlappingRoute = findOverlappingRoute(
+      path,
+      registeredPageLikeRoutes
+    );
+    if (overlappingRoute) {
+      throw new Error(
+        `Duplicate route "${path}": ${overlappingRoute.source} and ${file}`
+      );
+    }
+    if (handlerSeen.has(shape)) {
+      throw new Error(
+        `Duplicate handler route "${path}": ${handlerSeen.get(shape)} and ${file}`
+      );
+    }
+    handlerSeen.set(shape, file);
+    handlers.push({ path, app });
+  }
+
+  return sortRoutesBySpecificity(handlers);
+}
+
 export function buildManifest<TContext = unknown>(
   globs: RouteGlobs<TContext>,
   opts: BuildManifestOptions<TContext>
@@ -207,6 +273,7 @@ export function buildManifest<TContext = unknown>(
   const routes: Route<TContext>[] = [];
   const markdownSources = new Map<string, () => Promise<string>>();
   const seen = new Map<string, string>();
+  const registeredPageLikeRoutes: RegisteredRoutePath[] = [];
 
   // tsx pages
   for (const [file, load] of Object.entries(globs.pages)) {
@@ -223,6 +290,7 @@ export function buildManifest<TContext = unknown>(
     }
 
     seen.set(shape, file);
+    registeredPageLikeRoutes.push({ path, source: file });
     registerRouteEntry(
       path,
       load,
@@ -239,12 +307,23 @@ export function buildManifest<TContext = unknown>(
       continue;
     }
 
+    const overlappingRoute = findOverlappingRoute(
+      path,
+      registeredPageLikeRoutes
+    );
+    if (overlappingRoute) {
+      throw new Error(
+        `Duplicate route "${path}": ${overlappingRoute.source} and ${file}`
+      );
+    }
+
     const adapted = opts.markdownAdapter(raw, path);
     if (adapted.meta.draft && opts.filterDrafts) {
       continue;
     }
 
     seen.set(shape, file);
+    registeredPageLikeRoutes.push({ path, source: file });
     registerRouteEntry(
       path,
       adapted.load,
@@ -263,7 +342,9 @@ export function buildManifest<TContext = unknown>(
         `Duplicate route "${path}": ${seen.get(shape)} and programmatic route`
       );
     }
-    seen.set(shape, `programmatic:${path}`);
+    const source = `programmatic:${path}`;
+    seen.set(shape, source);
+    registeredPageLikeRoutes.push({ path, source });
     registerRouteEntry(
       path,
       load,
@@ -272,29 +353,9 @@ export function buildManifest<TContext = unknown>(
     );
   }
 
-  // handlers
-  const handlerSeen = new Map<string, string>();
-  const handlers: Array<{ app: Hono; path: string }> = [];
-  for (const [file, app] of Object.entries(globs.handlers)) {
-    const path = handlerFileToPath(file);
-    const shape = routePathToShape(path);
-    if (seen.has(shape)) {
-      throw new Error(
-        `Duplicate route "${path}": ${seen.get(shape)} and ${file}`
-      );
-    }
-    if (handlerSeen.has(shape)) {
-      throw new Error(
-        `Duplicate handler route "${path}": ${handlerSeen.get(shape)} and ${file}`
-      );
-    }
-    handlerSeen.set(shape, file);
-    handlers.push({ path, app });
-  }
-
   return {
     routes: sortRoutesBySpecificity(routes),
     markdownSources,
-    handlers: sortRoutesBySpecificity(handlers),
+    handlers: buildHandlerEntries(globs.handlers, registeredPageLikeRoutes),
   };
 }

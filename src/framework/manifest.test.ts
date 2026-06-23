@@ -4,6 +4,7 @@ import {
   buildManifest,
   resolveLayoutChain,
   routeFileToManifestPath,
+  routePathsOverlap,
   routePathToShape,
   sortRoutesBySpecificity,
   toMarkdownPath,
@@ -148,6 +149,24 @@ describe("routePathToShape", () => {
     expect(routePathToShape("/users/:name/books/:slug")).toBe(
       "/users/:param/books/:param"
     );
+  });
+});
+
+describe("routePathsOverlap", () => {
+  it("returns true for dynamic routes that subsume static routes", () => {
+    expect(routePathsOverlap("/users/:id", "/users/settings")).toBe(true);
+    expect(routePathsOverlap("/users/settings", "/users/:id")).toBe(true);
+  });
+
+  it("returns true for routes that can match the same URL", () => {
+    expect(routePathsOverlap("/users/:id/settings", "/users/foo/:tab")).toBe(
+      true
+    );
+  });
+
+  it("returns false for different static segments or segment lengths", () => {
+    expect(routePathsOverlap("/users/:id", "/teams/settings")).toBe(false);
+    expect(routePathsOverlap("/users/:id", "/users/:id/settings")).toBe(false);
   });
 });
 
@@ -512,6 +531,105 @@ describe("buildManifest", () => {
         opts
       )
     ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a dynamic page route overlaps a static handler route", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/users/[id].tsx": makePageLoader("User") },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/users/settings.ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a dynamic handler route overlaps a static page route", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/users/settings.tsx": makePageLoader("Settings") },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/users/[id].ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a dynamic programmatic route overlaps a static handler route", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: {},
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/users/settings.ts": fakeApp },
+        },
+        {
+          ...opts,
+          routes: [{ path: "/users/:id", load: makePageLoader("User") }],
+        }
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a static markdown route overlaps a dynamic handler route", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: {},
+          layouts: {},
+          contents: {
+            "../routes/users/settings.md": "---\ntitle: Settings\n---\nBody",
+          },
+          handlers: { "../routes/users/[id].ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a dynamic page route overlaps a static markdown route", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/users/[id].tsx": makePageLoader("User") },
+          layouts: {},
+          contents: {
+            "../routes/users/settings.md": "---\ntitle: Settings\n---\nBody",
+          },
+          handlers: {},
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("allows unrelated page and handler routes", () => {
+    const fakeApp = {} as import("hono").Hono;
+    const manifest = buildManifest(
+      {
+        pages: { "../routes/users/[id].tsx": makePageLoader("User") },
+        layouts: {},
+        contents: {},
+        handlers: { "../routes/teams/settings.ts": fakeApp },
+      },
+      opts
+    );
+
+    expect(manifest.routes.map((route) => route.path)).toEqual(["/users/:id"]);
+    expect(manifest.handlers.map((handler) => handler.path)).toEqual([
+      "/teams/settings",
+    ]);
   });
 
   it("throws when markdown content uses dynamic route syntax", () => {
