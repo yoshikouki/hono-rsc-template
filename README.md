@@ -199,7 +199,16 @@ export async function enumerate(): Promise<RouteManifestEntry[]> {
 
 Draft entries returned from `enumerate()` are excluded from `routeManifest()` in production.
 
-Dynamic filename routing such as `src/routes/books/[id]/index.tsx` is not implemented yet.
+Filename routes support single dynamic segments using Next.js-style brackets:
+
+```txt
+src/routes/books/[id]/index.tsx -> /books/:id
+src/routes/books/[id]/reviews/[reviewId].tsx -> /books/:id/reviews/:reviewId
+```
+
+Dynamic params are available from both `PageProps.params` and `RouteContext.params`.
+Catch-all and optional segments such as `[...slug]` and `[[slug]]` are intentionally unsupported and fail during manifest construction.
+Dynamic routes without `enumerate()` are excluded from `routeManifest()` because there is no concrete URL to publish in sitemap-like endpoints.
 
 ### createRequestContext (per-request data)
 

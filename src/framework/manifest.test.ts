@@ -4,6 +4,8 @@ import {
   buildManifest,
   resolveLayoutChain,
   routeFileToManifestPath,
+  routePathToShape,
+  sortRoutesBySpecificity,
   toMarkdownPath,
 } from "./manifest";
 import type { LayoutLoader, RouteMeta, RouteModule } from "./types";
@@ -135,6 +137,40 @@ describe("routeFileToManifestPath", () => {
     expect(() =>
       routeFileToManifestPath("../routes/blog/[[slug]]/index.tsx", ".tsx")
     ).toThrow(RE_UNSUPPORTED_DYNAMIC_ROUTE);
+  });
+});
+
+describe("routePathToShape", () => {
+  it("normalizes dynamic param names", () => {
+    expect(routePathToShape("/users/:id/books/:bookId")).toBe(
+      "/users/:param/books/:param"
+    );
+    expect(routePathToShape("/users/:name/books/:slug")).toBe(
+      "/users/:param/books/:param"
+    );
+  });
+});
+
+describe("sortRoutesBySpecificity", () => {
+  it("orders static sibling routes before dynamic routes", () => {
+    const routes = [
+      { path: "/users/:id" },
+      { path: "/users/settings" },
+      { path: "/users/:id/events/:eventId" },
+      { path: "/users/:id/events/settings" },
+    ];
+
+    expect(sortRoutesBySpecificity(routes).map((route) => route.path)).toEqual([
+      "/users/settings",
+      "/users/:id/events/settings",
+      "/users/:id/events/:eventId",
+      "/users/:id",
+    ]);
+  });
+
+  it("keeps stable ordering for routes with equal specificity", () => {
+    const routes = [{ path: "/about" }, { path: "/contact" }];
+    expect(sortRoutesBySpecificity(routes)).toEqual(routes);
   });
 });
 
@@ -307,7 +343,7 @@ describe("buildManifest", () => {
         {
           pages: {
             "../routes/users/[id].tsx": makePageLoader("A"),
-            "../routes/users/:id.tsx": makePageLoader("B"),
+            "../routes/users/[name].tsx": makePageLoader("B"),
           },
           layouts: {},
           contents: {},
@@ -316,6 +352,46 @@ describe("buildManifest", () => {
         opts
       )
     ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("sorts static page siblings before dynamic page siblings", () => {
+    const manifest = buildManifest(
+      {
+        pages: {
+          "../routes/users/[id].tsx": makePageLoader("User"),
+          "../routes/users/settings.tsx": makePageLoader("Settings"),
+        },
+        layouts: {},
+        contents: {},
+        handlers: {},
+      },
+      opts
+    );
+
+    expect(manifest.routes.map((route) => route.path)).toEqual([
+      "/users/settings",
+      "/users/:id",
+    ]);
+  });
+
+  it("keeps static page siblings first when they are discovered first", () => {
+    const manifest = buildManifest(
+      {
+        pages: {
+          "../routes/users/settings.tsx": makePageLoader("Settings"),
+          "../routes/users/[id].tsx": makePageLoader("User"),
+        },
+        layouts: {},
+        contents: {},
+        handlers: {},
+      },
+      opts
+    );
+
+    expect(manifest.routes.map((route) => route.path)).toEqual([
+      "/users/settings",
+      "/users/:id",
+    ]);
   });
 
   it("throws on duplicate handler routes", () => {
@@ -352,6 +428,45 @@ describe("buildManifest", () => {
     expect(manifest.handlers[0].path).toBe(
       "/app/parties/:partyId/events/:eventId"
     );
+  });
+
+  it("throws on duplicate handler route shapes with different param names", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: {},
+          layouts: {},
+          contents: {},
+          handlers: {
+            "../routes/users/[id].ts": fakeApp,
+            "../routes/users/[name].ts": fakeApp,
+          },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_HANDLER);
+  });
+
+  it("sorts static handler siblings before dynamic handler siblings", () => {
+    const fakeApp = {} as import("hono").Hono;
+    const manifest = buildManifest(
+      {
+        pages: {},
+        layouts: {},
+        contents: {},
+        handlers: {
+          "../routes/users/[id].ts": fakeApp,
+          "../routes/users/settings.ts": fakeApp,
+        },
+      },
+      opts
+    );
+
+    expect(manifest.handlers.map((handler) => handler.path)).toEqual([
+      "/users/settings",
+      "/users/:id",
+    ]);
   });
 
   it("throws when markdown content uses dynamic route syntax", () => {

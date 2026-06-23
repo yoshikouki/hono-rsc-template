@@ -305,6 +305,82 @@ describe("createApp", () => {
     await expect(res.json()).resolves.toEqual({ id: "alice" });
   });
 
+  it("serves static page siblings before dynamic pages when dynamic is discovered first", async () => {
+    const rendered: string[] = [];
+    const globs = makeGlobs({
+      pages: {
+        "./routes/users/[id].tsx": async (): Promise<RouteModule> => ({
+          default: () => {
+            rendered.push("dynamic");
+            return createElement("div", null, "dynamic");
+          },
+          resolveMeta: () => ({ title: "Dynamic" }),
+        }),
+        "./routes/users/settings.tsx": async (): Promise<RouteModule> => ({
+          default: () => {
+            rendered.push("settings");
+            return createElement("div", null, "settings");
+          },
+          resolveMeta: () => ({ title: "Settings" }),
+        }),
+      },
+    });
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+
+    const res = await app.request("/users/settings");
+
+    expect(res.status).toBe(200);
+    expect(rendered).toEqual(["settings"]);
+  });
+
+  it("serves static page siblings before dynamic pages when static is discovered first", async () => {
+    const rendered: string[] = [];
+    const globs = makeGlobs({
+      pages: {
+        "./routes/users/settings.tsx": async (): Promise<RouteModule> => ({
+          default: () => {
+            rendered.push("settings");
+            return createElement("div", null, "settings");
+          },
+          resolveMeta: () => ({ title: "Settings" }),
+        }),
+        "./routes/users/[id].tsx": async (): Promise<RouteModule> => ({
+          default: () => {
+            rendered.push("dynamic");
+            return createElement("div", null, "dynamic");
+          },
+          resolveMeta: () => ({ title: "Dynamic" }),
+        }),
+      },
+    });
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+
+    const res = await app.request("/users/settings");
+
+    expect(res.status).toBe(200);
+    expect(rendered).toEqual(["settings"]);
+  });
+
+  it("serves static handler siblings before dynamic handlers", async () => {
+    const { Hono } = await import("hono");
+    const dynamicHandler = new Hono();
+    dynamicHandler.get("/", (c) => c.text(`dynamic:${c.req.param("id")}`));
+    const settingsHandler = new Hono();
+    settingsHandler.get("/", (c) => c.text("settings"));
+    const globs = makeGlobs({
+      handlers: {
+        "./routes/users/[id].ts": dynamicHandler,
+        "./routes/users/settings.ts": settingsHandler,
+      },
+    });
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+
+    const res = await app.request("/users/settings");
+
+    expect(res.status).toBe(200);
+    await expect(res.text()).resolves.toBe("settings");
+  });
+
   it("returns 404 for unknown route without notFound", async () => {
     const app = createApp({
       site: baseSite,
@@ -405,6 +481,64 @@ describe("createApp", () => {
 
     expect(entries.map((entry) => entry.path)).toContain("/books/public");
     expect(entries.map((entry) => entry.path)).toContain("/books/draft");
+  });
+
+  it("excludes dynamic routes without enumerate from routeManifest", async () => {
+    const { Hono } = await import("hono");
+    const handler = new Hono<import("./types").AppEnv>();
+    handler.get("/", async (c) => c.json(await c.var.routeManifest()));
+    let resolveMetaCalled = false;
+
+    const globs = makeGlobs({
+      handlers: { "./routes/manifest.ts": handler },
+      pages: {
+        "./routes/users/[id].tsx": async (): Promise<RouteModule> => ({
+          default: () => createElement("div", null, "user"),
+          resolveMeta: ({ params }) => {
+            resolveMetaCalled = true;
+            if (!params.id) {
+              throw new Error("missing id");
+            }
+            return { title: params.id };
+          },
+        }),
+      },
+    });
+
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+    const res = await app.request("/manifest");
+    const entries =
+      (await res.json()) as import("./types").RouteManifestEntry[];
+
+    expect(entries.map((entry) => entry.path)).not.toContain("/users/:id");
+    expect(resolveMetaCalled).toBe(false);
+  });
+
+  it("includes dynamic routes with enumerate in routeManifest", async () => {
+    const { Hono } = await import("hono");
+    const handler = new Hono<import("./types").AppEnv>();
+    handler.get("/", async (c) => c.json(await c.var.routeManifest()));
+
+    const globs = makeGlobs({
+      handlers: { "./routes/manifest.ts": handler },
+      pages: {
+        "./routes/users/[id].tsx": async (): Promise<RouteModule> => ({
+          default: () => createElement("div", null, "user"),
+          enumerate: () => [{ path: "/users/alice", title: "Alice" }],
+          resolveMeta: () => {
+            throw new Error("resolveMeta should not run for enumerated routes");
+          },
+        }),
+      },
+    });
+
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+    const res = await app.request("/manifest");
+    const entries =
+      (await res.json()) as import("./types").RouteManifestEntry[];
+
+    expect(entries.map((entry) => entry.path)).toContain("/users/alice");
+    expect(entries.map((entry) => entry.path)).not.toContain("/users/:id");
   });
 
   it("exposes site via c.var.site in handlers", async () => {

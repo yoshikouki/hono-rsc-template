@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import { createMarkdownAdapter } from "./content/markdown";
 import { markdownResponse } from "./content/response";
-import { buildManifest, resolveLayoutChain, toMarkdownPath } from "./manifest";
+import {
+  buildManifest,
+  hasDynamicRouteSegments,
+  resolveLayoutChain,
+  toMarkdownPath,
+} from "./manifest";
 import { renderRouteToRscStream, resolveRouteMeta } from "./render";
 import type {
   AppEnv,
@@ -37,10 +42,6 @@ export function pagePathFromRscPath(pathname: string): string | null {
 function pagePathnameForRequest(request: Request): string {
   const pathname = new URL(request.url).pathname;
   return pagePathFromRscPath(pathname) ?? pathname;
-}
-
-function hasRouteParams(path: string): boolean {
-  return path.split("/").some((segment) => segment.startsWith(":"));
 }
 
 type RenderRsc = Parameters<typeof renderRouteToRscStream>[1];
@@ -121,6 +122,10 @@ async function collectRouteManifest<TContext = unknown>(
           includeRouteManifestEntry(entry)
         )
       );
+      continue;
+    }
+
+    if (hasDynamicRouteSegments(route.path)) {
       continue;
     }
 
@@ -248,7 +253,7 @@ export function createApp<TContext = unknown>({
     });
 
     // .md auto-generation
-    if (!hasRouteParams(route.path)) {
+    if (!hasDynamicRouteSegments(route.path)) {
       app.get(toMarkdownPath(route.path), async (c) => {
         const getMarkdown = manifest.markdownSources.get(route.path);
         if (!getMarkdown) {

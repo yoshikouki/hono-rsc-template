@@ -34,6 +34,10 @@ interface ManifestPath {
   routeDirectory: string;
 }
 
+interface RoutePathEntry {
+  path: string;
+}
+
 function stripRoutePrefix(file: string): string {
   return file.replace(RE_ROUTE_PREFIX, "");
 }
@@ -64,6 +68,47 @@ function segmentToRoutePath(segment: string, file: string): string {
   }
 
   return segment;
+}
+
+export function hasDynamicRouteSegments(path: string): boolean {
+  return path.split("/").some((segment) => segment.startsWith(":"));
+}
+
+export function routePathToShape(path: string): string {
+  const segments = path
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => (segment.startsWith(":") ? ":param" : segment));
+
+  return segments.length > 0 ? `/${segments.join("/")}` : "/";
+}
+
+function compareRouteSpecificity(a: string, b: string): number {
+  const aSegments = a.split("/").filter(Boolean);
+  const bSegments = b.split("/").filter(Boolean);
+  const length = Math.min(aSegments.length, bSegments.length);
+
+  for (let i = 0; i < length; i += 1) {
+    const aDynamic = aSegments[i].startsWith(":");
+    const bDynamic = bSegments[i].startsWith(":");
+    if (aDynamic !== bDynamic) {
+      return aDynamic ? 1 : -1;
+    }
+  }
+
+  return bSegments.length - aSegments.length;
+}
+
+export function sortRoutesBySpecificity<T extends RoutePathEntry>(
+  routes: T[]
+): T[] {
+  return routes
+    .map((route, index) => ({ index, route }))
+    .sort((a, b) => {
+      const specificity = compareRouteSpecificity(a.route.path, b.route.path);
+      return specificity === 0 ? a.index - b.index : specificity;
+    })
+    .map(({ route }) => route);
 }
 
 function dirname(path: string): string {
@@ -170,13 +215,14 @@ export function buildManifest<TContext = unknown>(
     }
 
     const { path, routeDirectory } = fileToPath(file);
-    if (seen.has(path)) {
+    const shape = routePathToShape(path);
+    if (seen.has(shape)) {
       throw new Error(
-        `Duplicate route "${path}": ${seen.get(path)} and ${file}`
+        `Duplicate route "${path}": ${seen.get(shape)} and ${file}`
       );
     }
 
-    seen.set(path, file);
+    seen.set(shape, file);
     registerRouteEntry(
       path,
       load,
@@ -188,7 +234,8 @@ export function buildManifest<TContext = unknown>(
   // md contents
   for (const [file, raw] of Object.entries(globs.contents)) {
     const path = contentFileToPath(file);
-    if (seen.has(path)) {
+    const shape = routePathToShape(path);
+    if (seen.has(shape)) {
       continue;
     }
 
@@ -197,7 +244,7 @@ export function buildManifest<TContext = unknown>(
       continue;
     }
 
-    seen.set(path, file);
+    seen.set(shape, file);
     registerRouteEntry(
       path,
       adapted.load,
@@ -210,12 +257,13 @@ export function buildManifest<TContext = unknown>(
   // programmatic routes
   for (const appRoute of opts.routes ?? []) {
     const { path, load } = appRoute;
-    if (seen.has(path)) {
+    const shape = routePathToShape(path);
+    if (seen.has(shape)) {
       throw new Error(
-        `Duplicate route "${path}": ${seen.get(path)} and programmatic route`
+        `Duplicate route "${path}": ${seen.get(shape)} and programmatic route`
       );
     }
-    seen.set(path, `programmatic:${path}`);
+    seen.set(shape, `programmatic:${path}`);
     registerRouteEntry(
       path,
       load,
@@ -229,14 +277,19 @@ export function buildManifest<TContext = unknown>(
   const handlers: Array<{ app: Hono; path: string }> = [];
   for (const [file, app] of Object.entries(globs.handlers)) {
     const path = handlerFileToPath(file);
-    if (handlerSeen.has(path)) {
+    const shape = routePathToShape(path);
+    if (handlerSeen.has(shape)) {
       throw new Error(
-        `Duplicate handler route "${path}": ${handlerSeen.get(path)} and ${file}`
+        `Duplicate handler route "${path}": ${handlerSeen.get(shape)} and ${file}`
       );
     }
-    handlerSeen.set(path, file);
+    handlerSeen.set(shape, file);
     handlers.push({ path, app });
   }
 
-  return { routes, markdownSources, handlers };
+  return {
+    routes: sortRoutesBySpecificity(routes),
+    markdownSources,
+    handlers: sortRoutesBySpecificity(handlers),
+  };
 }
