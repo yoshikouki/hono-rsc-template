@@ -200,6 +200,33 @@ describe("buildDocumentElement", () => {
     });
     expect(layoutSpy).toHaveBeenCalled();
   });
+
+  it("passes params to page default and resolveMeta", async () => {
+    const defaultSpy = vi.fn(() => createElement("div", null, "party"));
+    const resolveMetaSpy = vi.fn(() => ({ title: "Party" }));
+    const route: Pick<Route, "layouts" | "load"> = {
+      layouts: [],
+      load: async () => ({
+        default: defaultSpy,
+        resolveMeta: resolveMetaSpy,
+      }),
+    };
+
+    await buildDocumentElement({
+      site: baseSite,
+      route,
+      pathname: "/app/parties/abc",
+      request,
+      params: { partyId: "abc" },
+    });
+
+    expect(defaultSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ params: { partyId: "abc" } })
+    );
+    expect(resolveMetaSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ params: { partyId: "abc" } })
+    );
+  });
 });
 
 describe("renderRouteToRscStream", () => {

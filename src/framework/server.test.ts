@@ -254,6 +254,57 @@ describe("createApp", () => {
     await expect(res.text()).resolves.toBe("ok");
   });
 
+  it("passes dynamic params to HTML and RSC page renders", async () => {
+    const defaultParams: Record<string, string>[] = [];
+    const metaParams: Record<string, string>[] = [];
+    const pathnames: string[] = [];
+    const globs = makeGlobs({
+      pages: {
+        "./routes/app/parties/[partyId]/events/[eventId]/index.tsx":
+          async (): Promise<RouteModule> => ({
+            default: ({ params }) => {
+              defaultParams.push(params);
+              return createElement("div", null, "event");
+            },
+            resolveMeta: ({ params, pathname }) => {
+              metaParams.push(params);
+              pathnames.push(pathname);
+              return { title: `${params.partyId}:${params.eventId}` };
+            },
+          }),
+      },
+    });
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+
+    const htmlRes = await app.request("/app/parties/p1/events/e2");
+    const rscRes = await app.request("/__rsc/app/parties/p1/events/e2");
+
+    expect(htmlRes.status).toBe(200);
+    expect(rscRes.status).toBe(200);
+    expect(defaultParams).toEqual([
+      { partyId: "p1", eventId: "e2" },
+      { partyId: "p1", eventId: "e2" },
+    ]);
+    expect(metaParams).toEqual(defaultParams);
+    expect(pathnames).toEqual([
+      "/app/parties/p1/events/e2",
+      "/app/parties/p1/events/e2",
+    ]);
+  });
+
+  it("routes dynamic handler paths", async () => {
+    const { Hono } = await import("hono");
+    const handler = new Hono();
+    handler.get("/", (c) => c.json(c.req.param()));
+    const globs = makeGlobs({
+      handlers: { "./routes/users/[id].ts": handler },
+    });
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+    const res = await app.request("/users/alice");
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ id: "alice" });
+  });
+
   it("returns 404 for unknown route without notFound", async () => {
     const app = createApp({
       site: baseSite,

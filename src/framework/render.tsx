@@ -12,6 +12,7 @@ import type {
 export interface RenderRouteInput<TContext = unknown> {
   context?: TContext;
   noindex?: boolean;
+  params?: Record<string, string>;
   pathname: string;
   request: Request;
   route: Pick<Route<TContext>, "layouts" | "load">;
@@ -76,7 +77,7 @@ export async function buildDocumentElement<TContext = unknown>(
   ]);
   const routeContext = {
     context,
-    params: {},
+    params: input.params ?? {},
     pathname,
     request: input.request,
   };

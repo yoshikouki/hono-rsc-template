@@ -27,25 +27,86 @@ const RE_TS_EXT = /\.ts$/;
 const RE_MD_EXT = /\.md$/;
 const RE_TRAILING_INDEX = /(^|\/)index$/;
 const RE_LAYOUT_TSX_FILE = /(?:^|\/)layout\.tsx$/;
+const RE_DYNAMIC_SEGMENT = /^\[([A-Za-z_$][\w$]*)\]$/;
 
-function fileToPath(file: string): string {
-  // WIP: dynamic route segments such as [id] are intentionally not supported yet.
-  const withoutPrefix = file.replace(RE_ROUTE_PREFIX, "");
-  const withoutExt = withoutPrefix.replace(RE_TSX_EXT, "");
+interface ManifestPath {
+  path: string;
+  routeDirectory: string;
+}
+
+function stripRoutePrefix(file: string): string {
+  return file.replace(RE_ROUTE_PREFIX, "");
+}
+
+function stripExtension(
+  file: string,
+  extension: ".md" | ".ts" | ".tsx"
+): string {
+  if (extension === ".tsx") {
+    return file.replace(RE_TSX_EXT, "");
+  }
+  if (extension === ".ts") {
+    return file.replace(RE_TS_EXT, "");
+  }
+  return file.replace(RE_MD_EXT, "");
+}
+
+function segmentToRoutePath(segment: string, file: string): string {
+  const match = segment.match(RE_DYNAMIC_SEGMENT);
+  if (match) {
+    return `:${match[1]}`;
+  }
+
+  if (segment.includes("[") || segment.includes("]")) {
+    throw new Error(
+      `Unsupported dynamic route segment "${segment}" in ${file}. Only single segments like [id] are supported.`
+    );
+  }
+
+  return segment;
+}
+
+function dirname(path: string): string {
+  const index = path.lastIndexOf("/");
+  return index === -1 ? "" : path.slice(0, index);
+}
+
+export function routeFileToManifestPath(
+  file: string,
+  extension: ".ts" | ".tsx"
+): ManifestPath {
+  const withoutPrefix = stripRoutePrefix(file);
+  const withoutExt = stripExtension(withoutPrefix, extension);
   const withoutIndex = withoutExt.replace(RE_TRAILING_INDEX, "");
-  return withoutIndex ? `/${withoutIndex}` : "/";
+  const pathSegments = withoutIndex
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => segmentToRoutePath(segment, file));
+
+  return {
+    path: pathSegments.length > 0 ? `/${pathSegments.join("/")}` : "/",
+    routeDirectory: RE_TRAILING_INDEX.test(withoutExt)
+      ? withoutIndex
+      : dirname(withoutExt),
+  };
+}
+
+function fileToPath(file: string): ManifestPath {
+  return routeFileToManifestPath(file, ".tsx");
 }
 
 function handlerFileToPath(file: string): string {
-  const withoutPrefix = file.replace(RE_ROUTE_PREFIX, "");
-  const withoutExt = withoutPrefix.replace(RE_TS_EXT, "");
-  const withoutIndex = withoutExt.replace(RE_TRAILING_INDEX, "");
-  return withoutIndex ? `/${withoutIndex}` : "/";
+  return routeFileToManifestPath(file, ".ts").path;
 }
 
 function contentFileToPath(file: string): string {
-  const withoutPrefix = file.replace(RE_ROUTE_PREFIX, "");
-  const withoutExt = withoutPrefix.replace(RE_MD_EXT, "");
+  const withoutPrefix = stripRoutePrefix(file);
+  const withoutExt = stripExtension(withoutPrefix, ".md");
+  if (withoutExt.includes("[") || withoutExt.includes("]")) {
+    throw new Error(
+      `Markdown routes do not support dynamic segments in ${file}. Use a TSX route when params are needed.`
+    );
+  }
   return `/${withoutExt}`;
 }
 
@@ -54,10 +115,10 @@ export function toMarkdownPath(path: string): string {
 }
 
 export function resolveLayoutChain<TContext = unknown>(
-  path: string,
+  routeDirectory: string,
   layouts: Record<string, LayoutLoader<TContext>>
 ): LayoutEntry<TContext>[] {
-  const segments = path.split("/").filter(Boolean);
+  const segments = routeDirectory.split("/").filter(Boolean);
   const directories = [""];
 
   for (let i = 0; i < segments.length; i += 1) {
@@ -108,7 +169,7 @@ export function buildManifest<TContext = unknown>(
       continue;
     }
 
-    const path = fileToPath(file);
+    const { path, routeDirectory } = fileToPath(file);
     if (seen.has(path)) {
       throw new Error(
         `Duplicate route "${path}": ${seen.get(path)} and ${file}`
@@ -119,7 +180,7 @@ export function buildManifest<TContext = unknown>(
     registerRouteEntry(
       path,
       load,
-      resolveLayoutChain(path, globs.layouts),
+      resolveLayoutChain(routeDirectory, globs.layouts),
       routes
     );
   }

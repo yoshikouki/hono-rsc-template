@@ -34,6 +34,15 @@ export function pagePathFromRscPath(pathname: string): string | null {
   return pathname.slice(RSC_ROUTE_PREFIX.length);
 }
 
+function pagePathnameForRequest(request: Request): string {
+  const pathname = new URL(request.url).pathname;
+  return pagePathFromRscPath(pathname) ?? pathname;
+}
+
+function hasRouteParams(path: string): boolean {
+  return path.split("/").some((segment) => segment.startsWith(":"));
+}
+
 type RenderRsc = Parameters<typeof renderRouteToRscStream>[1];
 
 type RenderHtml = (
@@ -194,8 +203,16 @@ export function createApp<TContext = unknown>({
       const context = createRequestContext
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
+      const params = c.req.param();
       const rscStream = await renderRouteToRscStream(
-        { site, route, pathname: route.path, request: c.req.raw, context },
+        {
+          site,
+          route,
+          pathname: pagePathnameForRequest(c.req.raw),
+          request: c.req.raw,
+          context,
+          params,
+        },
         renderRsc
       );
       const response = await renderHtmlResponse(
@@ -215,35 +232,45 @@ export function createApp<TContext = unknown>({
       const context = createRequestContext
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
+      const params = c.req.param();
       const rscStream = await renderRouteToRscStream(
-        { site, route, pathname: route.path, request: c.req.raw, context },
+        {
+          site,
+          route,
+          pathname: pagePathnameForRequest(c.req.raw),
+          request: c.req.raw,
+          context,
+          params,
+        },
         renderRsc
       );
       return renderRscResponse(rscStream.stream);
     });
 
     // .md auto-generation
-    app.get(toMarkdownPath(route.path), async (c) => {
-      const getMarkdown = manifest.markdownSources.get(route.path);
-      if (!getMarkdown) {
-        const context = createRequestContext
-          ? await createRequestContext(c.req.raw)
-          : (undefined as TContext);
-        const pageModule = await route.load();
-        const meta = await resolveRouteMeta(pageModule, {
-          context,
-          params: {},
-          pathname: route.path,
-          request: c.req.raw,
-        });
-        const markdown = await meta.markdown?.();
-        if (!markdown) {
-          return new Response("Not Found", { status: 404 });
+    if (!hasRouteParams(route.path)) {
+      app.get(toMarkdownPath(route.path), async (c) => {
+        const getMarkdown = manifest.markdownSources.get(route.path);
+        if (!getMarkdown) {
+          const context = createRequestContext
+            ? await createRequestContext(c.req.raw)
+            : (undefined as TContext);
+          const pageModule = await route.load();
+          const meta = await resolveRouteMeta(pageModule, {
+            context,
+            params: {},
+            pathname: pagePathnameForRequest(c.req.raw),
+            request: c.req.raw,
+          });
+          const markdown = await meta.markdown?.();
+          if (!markdown) {
+            return new Response("Not Found", { status: 404 });
+          }
+          return markdownResponse(markdown);
         }
-        return markdownResponse(markdown);
-      }
-      return markdownResponse(await getMarkdown());
-    });
+        return markdownResponse(await getMarkdown());
+      });
+    }
   }
 
   // Handler routes

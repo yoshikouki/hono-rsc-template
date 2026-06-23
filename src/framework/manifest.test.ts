@@ -1,12 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import type { MarkdownAdapter } from "./content/markdown";
-import { buildManifest, resolveLayoutChain, toMarkdownPath } from "./manifest";
+import {
+  buildManifest,
+  resolveLayoutChain,
+  routeFileToManifestPath,
+  toMarkdownPath,
+} from "./manifest";
 import type { LayoutLoader, RouteMeta, RouteModule } from "./types";
 
 const RE_STUB_TITLE = /^---\ntitle: ([^\n]*)\n/;
 const RE_STUB_DRAFT = /draft: true/;
 const RE_DUPLICATE_ROUTE = /Duplicate route/;
 const RE_DUPLICATE_HANDLER = /Duplicate handler route/;
+const RE_UNSUPPORTED_DYNAMIC_ROUTE = /Unsupported dynamic route segment/;
+const RE_MARKDOWN_DYNAMIC_ROUTE =
+  /Markdown routes do not support dynamic segments/;
 
 const stubAdapter: MarkdownAdapter = (raw, path) => {
   const fm = raw.match(RE_STUB_TITLE);
@@ -82,6 +90,51 @@ describe("resolveLayoutChain", () => {
       "./routes/layout.tsx": layoutLoader,
     });
     expect(chain.map((l) => l.file)).toEqual(["./routes/layout.tsx"]);
+  });
+});
+
+describe("routeFileToManifestPath", () => {
+  it("converts [partyId] to :partyId", () => {
+    expect(
+      routeFileToManifestPath(
+        "../routes/app/parties/[partyId]/index.tsx",
+        ".tsx"
+      )
+    ).toEqual({
+      path: "/app/parties/:partyId",
+      routeDirectory: "app/parties/[partyId]",
+    });
+  });
+
+  it("converts nested dynamic segments", () => {
+    expect(
+      routeFileToManifestPath(
+        "../routes/app/parties/[partyId]/events/[eventId]/reception.tsx",
+        ".tsx"
+      )
+    ).toEqual({
+      path: "/app/parties/:partyId/events/:eventId/reception",
+      routeDirectory: "app/parties/[partyId]/events/[eventId]",
+    });
+  });
+
+  it("removes trailing index segments", () => {
+    expect(routeFileToManifestPath("../routes/app/index.tsx", ".tsx")).toEqual({
+      path: "/app",
+      routeDirectory: "app",
+    });
+  });
+
+  it("throws on catch-all dynamic segments", () => {
+    expect(() =>
+      routeFileToManifestPath("../routes/blog/[...slug]/index.tsx", ".tsx")
+    ).toThrow(RE_UNSUPPORTED_DYNAMIC_ROUTE);
+  });
+
+  it("throws on optional dynamic segments", () => {
+    expect(() =>
+      routeFileToManifestPath("../routes/blog/[[slug]]/index.tsx", ".tsx")
+    ).toThrow(RE_UNSUPPORTED_DYNAMIC_ROUTE);
   });
 });
 
@@ -220,6 +273,51 @@ describe("buildManifest", () => {
     ]);
   });
 
+  it("resolves dynamic route layouts from route file directories", () => {
+    const manifest = buildManifest(
+      {
+        pages: {
+          "../routes/app/parties/[partyId]/index.tsx": makePageLoader("Party"),
+        },
+        layouts: {
+          "../routes/layout.tsx": layoutLoader,
+          "../routes/app/layout.tsx": layoutLoader,
+          "../routes/app/parties/layout.tsx": layoutLoader,
+          "../routes/app/parties/[partyId]/layout.tsx": layoutLoader,
+        },
+        contents: {},
+        handlers: {},
+      },
+      opts
+    );
+    const route = manifest.routes.find(
+      (r) => r.path === "/app/parties/:partyId"
+    );
+    expect(route?.layouts.map((l) => l.file)).toEqual([
+      "../routes/layout.tsx",
+      "../routes/app/layout.tsx",
+      "../routes/app/parties/layout.tsx",
+      "../routes/app/parties/[partyId]/layout.tsx",
+    ]);
+  });
+
+  it("throws on duplicate dynamic tsx routes", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: {
+            "../routes/users/[id].tsx": makePageLoader("A"),
+            "../routes/users/:id.tsx": makePageLoader("B"),
+          },
+          layouts: {},
+          contents: {},
+          handlers: {},
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
   it("throws on duplicate handler routes", () => {
     const fakeApp = {} as import("hono").Hono;
     expect(() =>
@@ -236,6 +334,38 @@ describe("buildManifest", () => {
         opts
       )
     ).toThrow(RE_DUPLICATE_HANDLER);
+  });
+
+  it("builds dynamic handler routes with the same file path conversion", () => {
+    const fakeApp = {} as import("hono").Hono;
+    const manifest = buildManifest(
+      {
+        pages: {},
+        layouts: {},
+        contents: {},
+        handlers: {
+          "../routes/app/parties/[partyId]/events/[eventId].ts": fakeApp,
+        },
+      },
+      opts
+    );
+    expect(manifest.handlers[0].path).toBe(
+      "/app/parties/:partyId/events/:eventId"
+    );
+  });
+
+  it("throws when markdown content uses dynamic route syntax", () => {
+    expect(() =>
+      buildManifest(
+        {
+          pages: {},
+          layouts: {},
+          contents: { "../routes/blog/[slug].md": "---\ntitle: Blog\n---" },
+          handlers: {},
+        },
+        opts
+      )
+    ).toThrow(RE_MARKDOWN_DYNAMIC_ROUTE);
   });
 
   it("collects handlers", () => {
