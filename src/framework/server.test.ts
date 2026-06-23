@@ -308,6 +308,47 @@ describe("createApp", () => {
     ]);
   });
 
+  it("serves static markdown siblings without shadowing by dynamic pages", async () => {
+    const renderedDynamicIds: string[] = [];
+    const globs = makeGlobs({
+      pages: {
+        "./routes/users/[id].tsx": async (): Promise<RouteModule> => ({
+          default: ({ params }) => {
+            renderedDynamicIds.push(params.id);
+            return createElement("div", null, `user:${params.id}`);
+          },
+          resolveMeta: ({ params }) => ({ title: `User ${params.id}` }),
+        }),
+      },
+      contents: {
+        "./routes/users/settings.md": "---\ntitle: Settings\n---\nSettings",
+      },
+    });
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+
+    const settingsHtml = await app.request("/users/settings");
+    const settingsMarkdown = await app.request("/users/settings.md");
+    const dynamicHtml = await app.request("/users/alice");
+    const settingsRsc = await app.request("/__rsc/users/settings");
+    const dynamicRsc = await app.request("/__rsc/users/alice");
+
+    expect(settingsHtml.status).toBe(200);
+    expect(settingsMarkdown.status).toBe(200);
+    expect(dynamicHtml.status).toBe(200);
+    expect(settingsRsc.status).toBe(200);
+    expect(dynamicRsc.status).toBe(200);
+    expect(settingsMarkdown.headers.get("Content-Type")).toContain(
+      "text/markdown"
+    );
+    expect(settingsRsc.headers.get("Content-Type")).toContain(
+      "text/x-component"
+    );
+    expect(dynamicRsc.headers.get("Content-Type")).toContain(
+      "text/x-component"
+    );
+    expect(renderedDynamicIds).toEqual(["alice", "alice"]);
+  });
+
   it("passes canonical pathnames to HTML, RSC, and markdown metadata", async () => {
     const pathnames: string[] = [];
     const globs = makeGlobs({

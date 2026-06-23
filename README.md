@@ -207,6 +207,9 @@ src/routes/books/[id]/reviews/[reviewId].tsx -> /books/:id/reviews/:reviewId
 ```
 
 Dynamic params are available from both `PageProps.params` and `RouteContext.params`.
+Markdown content routes are static-only; dynamic Markdown files such as `src/routes/blog/[slug].md` fail during manifest construction.
+Dynamic page routes should use `.tsx` pages or programmatic routes.
+Generated `.md` endpoints are available only for static page-like routes, so a dynamic route such as `/books/:id` does not generate `/books/foo.md`.
 Catch-all and optional segments such as `[...slug]` and `[[slug]]` are intentionally unsupported and fail during manifest construction.
 Dynamic routes without `enumerate()` are excluded from `routeManifest()` because there is no concrete URL to publish in sitemap-like endpoints.
 
