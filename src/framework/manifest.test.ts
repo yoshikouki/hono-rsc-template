@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { MarkdownAdapter } from "./content/markdown";
 import {
   buildManifest,
+  generatedRoutePathsForRoute,
   resolveLayoutChain,
   routeFileToManifestPath,
   routePathsOverlap,
@@ -167,6 +168,21 @@ describe("routePathsOverlap", () => {
   it("returns false for different static segments or segment lengths", () => {
     expect(routePathsOverlap("/users/:id", "/teams/settings")).toBe(false);
     expect(routePathsOverlap("/users/:id", "/users/:id/settings")).toBe(false);
+  });
+});
+
+describe("generatedRoutePathsForRoute", () => {
+  it("generates RSC and markdown routes for static routes", () => {
+    expect(generatedRoutePathsForRoute("/about")).toEqual([
+      "/__rsc/about",
+      "/about.md",
+    ]);
+  });
+
+  it("does not generate markdown routes for dynamic routes", () => {
+    expect(generatedRoutePathsForRoute("/users/:id")).toEqual([
+      "/__rsc/users/:id",
+    ]);
   });
 });
 
@@ -629,6 +645,85 @@ describe("buildManifest", () => {
     expect(manifest.routes.map((route) => route.path)).toEqual(["/users/:id"]);
     expect(manifest.handlers.map((handler) => handler.path)).toEqual([
       "/teams/settings",
+    ]);
+  });
+
+  it("throws when a handler overlaps a generated markdown route", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/about.tsx": makePageLoader("About") },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/about.md.ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a handler overlaps a generated RSC route", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/about.tsx": makePageLoader("About") },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/__rsc/about.ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a static page generated markdown route overlaps a handler", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: {
+            "../routes/users/settings.tsx": makePageLoader("Settings"),
+          },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/users/settings.md.ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("throws when a dynamic page generated RSC route overlaps a static handler", () => {
+    const fakeApp = {} as import("hono").Hono;
+    expect(() =>
+      buildManifest(
+        {
+          pages: { "../routes/users/[id].tsx": makePageLoader("User") },
+          layouts: {},
+          contents: {},
+          handlers: { "../routes/__rsc/users/settings.ts": fakeApp },
+        },
+        opts
+      )
+    ).toThrow(RE_DUPLICATE_ROUTE);
+  });
+
+  it("allows handlers unrelated to generated framework routes", () => {
+    const fakeApp = {} as import("hono").Hono;
+    const manifest = buildManifest(
+      {
+        pages: { "../routes/about.tsx": makePageLoader("About") },
+        layouts: {},
+        contents: {},
+        handlers: { "../routes/api/about.md.ts": fakeApp },
+      },
+      opts
+    );
+
+    expect(manifest.handlers.map((handler) => handler.path)).toEqual([
+      "/api/about.md",
     ]);
   });
 

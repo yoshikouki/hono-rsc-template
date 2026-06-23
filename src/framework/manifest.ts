@@ -28,6 +28,7 @@ const RE_MD_EXT = /\.md$/;
 const RE_TRAILING_INDEX = /(^|\/)index$/;
 const RE_LAYOUT_TSX_FILE = /(?:^|\/)layout\.tsx$/;
 const RE_DYNAMIC_SEGMENT = /^\[([A-Za-z_$][\w$]*)\]$/;
+const RSC_ROUTE_PREFIX = "/__rsc";
 
 interface ManifestPath {
   path: string;
@@ -39,6 +40,7 @@ interface RoutePathEntry {
 }
 
 interface RegisteredRoutePath {
+  generated?: boolean;
   path: string;
   source: string;
 }
@@ -187,6 +189,18 @@ export function toMarkdownPath(path: string): string {
   return path === "/" ? "/index.md" : `${path}.md`;
 }
 
+function rscPathFor(path: string): string {
+  return path === "/" ? RSC_ROUTE_PREFIX : `${RSC_ROUTE_PREFIX}${path}`;
+}
+
+export function generatedRoutePathsForRoute(path: string): string[] {
+  const paths = [rscPathFor(path)];
+  if (!hasDynamicRouteSegments(path)) {
+    paths.push(toMarkdownPath(path));
+  }
+  return paths;
+}
+
 export function resolveLayoutChain<TContext = unknown>(
   routeDirectory: string,
   layouts: Record<string, LayoutLoader<TContext>>
@@ -233,6 +247,21 @@ function findOverlappingRoute(
   registered: RegisteredRoutePath[]
 ): RegisteredRoutePath | undefined {
   return registered.find((entry) => routePathsOverlap(path, entry.path));
+}
+
+function registerPageLikeRoutePath(
+  path: string,
+  source: string,
+  registered: RegisteredRoutePath[]
+): void {
+  registered.push({ path, source });
+  for (const generatedPath of generatedRoutePathsForRoute(path)) {
+    registered.push({
+      generated: true,
+      path: generatedPath,
+      source: `${source} generated route ${generatedPath}`,
+    });
+  }
 }
 
 function buildHandlerEntries(
@@ -290,7 +319,7 @@ export function buildManifest<TContext = unknown>(
     }
 
     seen.set(shape, file);
-    registeredPageLikeRoutes.push({ path, source: file });
+    registerPageLikeRoutePath(path, file, registeredPageLikeRoutes);
     registerRouteEntry(
       path,
       load,
@@ -323,7 +352,7 @@ export function buildManifest<TContext = unknown>(
     }
 
     seen.set(shape, file);
-    registeredPageLikeRoutes.push({ path, source: file });
+    registerPageLikeRoutePath(path, file, registeredPageLikeRoutes);
     registerRouteEntry(
       path,
       adapted.load,
@@ -344,7 +373,7 @@ export function buildManifest<TContext = unknown>(
     }
     const source = `programmatic:${path}`;
     seen.set(shape, source);
-    registeredPageLikeRoutes.push({ path, source });
+    registerPageLikeRoutePath(path, source, registeredPageLikeRoutes);
     registerRouteEntry(
       path,
       load,
