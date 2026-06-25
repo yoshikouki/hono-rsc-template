@@ -1,10 +1,25 @@
+import {
+  pathnameFromRoutePath as corePathnameFromRoutePath,
+  createRouteManifest,
+  type FileRoute,
+  type FileRouteRenderer,
+  type GlobFiles,
+  mountFileRoutes,
+  type RenderInput,
+  type RouteManifest,
+  type RouteSource,
+} from "@yoshikouki/hono-file-router";
+import { honoRoutes } from "@yoshikouki/hono-file-router/hono-routes";
 import { Hono } from "hono";
-import { createMarkdownAdapter } from "./content/markdown";
+import {
+  createMarkdownAdapter,
+  type MarkdownAdapter,
+} from "./content/markdown";
 import { markdownResponse } from "./content/response";
 import {
-  buildManifest,
   hasDynamicRouteSegments,
   resolveLayoutChain,
+  routeFileToManifestPath,
   toMarkdownPath,
 } from "./manifest";
 import { renderRouteToRscStream, resolveRouteMeta } from "./render";
@@ -22,7 +37,9 @@ const RSC_CONTENT_TYPE = "text/x-component;charset=utf-8";
 const HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 const RSC_CACHE_CONTROL = "private, no-store";
 const RSC_ROUTE_PREFIX = "/__rsc";
-const RE_HONO_PARAM_NAME = /^[A-Za-z_$][\w$]*/;
+const RE_LAYOUT_TSX_FILE = /(?:^|\/)layout\.tsx$/;
+const RE_MARKDOWN_EXT = /\.md$/;
+const RE_ROUTE_PREFIX = /^(?:\.\.?\/)*routes\//;
 
 export function rscPathFor(path: string): string {
   return path === "/" ? RSC_ROUTE_PREFIX : `${RSC_ROUTE_PREFIX}${path}`;
@@ -40,33 +57,11 @@ export function pagePathFromRscPath(pathname: string): string | null {
   return pathname.slice(RSC_ROUTE_PREFIX.length);
 }
 
-function routeParamName(segment: string): string | null {
-  if (!segment.startsWith(":")) {
-    return null;
-  }
-
-  return segment.slice(1).match(RE_HONO_PARAM_NAME)?.[0] ?? null;
-}
-
 export function pathnameFromRoutePath(
   routePath: string,
   params: Record<string, string>
 ): string {
-  const segments = routePath
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => {
-      const paramName = routeParamName(segment);
-      if (!paramName) {
-        return segment;
-      }
-
-      return Object.hasOwn(params, paramName)
-        ? encodeURIComponent(params[paramName])
-        : segment;
-    });
-
-  return segments.length > 0 ? `/${segments.join("/")}` : "/";
+  return corePathnameFromRoutePath(routePath, params);
 }
 
 type RenderRsc = Parameters<typeof renderRouteToRscStream>[1];
@@ -81,6 +76,15 @@ export interface Renderer {
   renderRsc?: RenderRsc;
 }
 
+type AppFileRoute<TContext = unknown> = FileRoute<RouteModule<TContext>>;
+
+interface AppRendererOptions<TContext = unknown> {
+  layouts: RouteGlobs<TContext>["layouts"];
+  renderHtml: RenderHtml;
+  renderRsc?: RenderRsc;
+  site: SiteConfig<TContext>;
+}
+
 interface CreateAppOptions<TContext = unknown> {
   createRequestContext?: (request: Request) => TContext | Promise<TContext>;
   globs: RouteGlobs<TContext>;
@@ -88,6 +92,11 @@ interface CreateAppOptions<TContext = unknown> {
   renderer?: Renderer;
   routes?: AppRoute<TContext>[];
   site: SiteConfig<TContext>;
+}
+
+interface PreparedMarkdownRoutes<TContext = unknown> {
+  files: GlobFiles<RouteModule<TContext>>;
+  markdownSources: Map<string, () => Promise<string>>;
 }
 
 async function defaultRenderHtml(
@@ -132,15 +141,293 @@ export function includeRouteManifestEntry(
   return !(entry.draft && env.PROD);
 }
 
+function routeSourceKey(file: string): string {
+  return file.replace(RE_ROUTE_PREFIX, "");
+}
+
+function routeSourceFiles<T>(
+  files: Record<string, T>,
+  options: { excludeLayouts?: boolean } = {}
+): GlobFiles<T> {
+  const entries = Object.entries(files).flatMap(([file, value]) => {
+    if (options.excludeLayouts && RE_LAYOUT_TSX_FILE.test(file)) {
+      return [];
+    }
+    return [[routeSourceKey(file), value] as const];
+  });
+  return Object.fromEntries(entries);
+}
+
+function programmaticRouteFile(path: string): string {
+  const trimmed = path.replace(/^\/+|\/+$/g, "");
+  return `${trimmed || "index"}.tsx`;
+}
+
+function renderableRoute<TContext>(
+  route: AppFileRoute<TContext>,
+  layouts: RouteGlobs<TContext>["layouts"]
+): Pick<Route<TContext>, "layouts" | "load"> {
+  if (!route.load) {
+    throw new Error(`Route "${route.path}" does not have a loader.`);
+  }
+  return {
+    load: route.load,
+    layouts: resolveLayoutChain(route.routeDirectory, layouts),
+  };
+}
+
+async function renderAppRoute<TContext>(
+  input: RenderInput<TContext, RouteModule<TContext>>,
+  options: AppRendererOptions<TContext>
+): Promise<{
+  meta: Awaited<ReturnType<typeof renderRouteToRscStream>>["meta"];
+  response: Response;
+}> {
+  const rscStream = await renderRouteToRscStream(
+    {
+      site: options.site,
+      route: renderableRoute(input.route, options.layouts),
+      pathname: input.pathname,
+      request: input.request,
+      context: input.context,
+      params: input.params,
+    },
+    options.renderRsc
+  );
+  const response = await renderHtmlResponse(
+    input.request,
+    rscStream.stream,
+    options.renderHtml
+  );
+
+  if (rscStream.meta.cacheControl) {
+    response.headers.set("Cache-Control", rscStream.meta.cacheControl);
+  }
+
+  return { meta: rscStream.meta, response };
+}
+
+async function renderAppRscRoute<TContext>(
+  input: RenderInput<TContext, RouteModule<TContext>>,
+  options: AppRendererOptions<TContext>,
+  init?: ResponseInit
+): Promise<Response> {
+  const rscStream = await renderRouteToRscStream(
+    {
+      site: options.site,
+      route: renderableRoute(input.route, options.layouts),
+      pathname: input.pathname,
+      request: input.request,
+      context: input.context,
+      params: input.params,
+    },
+    options.renderRsc
+  );
+  return renderRscResponse(rscStream.stream, init);
+}
+
+function createPageRenderer<TContext>(
+  options: AppRendererOptions<TContext>
+): FileRouteRenderer<TContext, RouteModule<TContext>> {
+  return {
+    name: "template-rsc-page",
+    accepts(route) {
+      return route.file.endsWith(".tsx");
+    },
+    generatedRoutes(route) {
+      const generated = [
+        {
+          kind: "rsc",
+          method: "GET" as const,
+          owner: route.id,
+          path: rscPathFor(route.path),
+          render: (input: RenderInput<TContext, RouteModule<TContext>>) =>
+            renderAppRscRoute(input, options),
+        },
+      ];
+
+      if (hasDynamicRouteSegments(route.path)) {
+        return generated;
+      }
+
+      return [
+        ...generated,
+        {
+          kind: "markdown",
+          method: "GET" as const,
+          owner: route.id,
+          path: toMarkdownPath(route.path),
+          async render(input: RenderInput<TContext, RouteModule<TContext>>) {
+            const pageModule = await input.route.load?.();
+            if (!pageModule) {
+              return new Response("Not Found", { status: 404 });
+            }
+            const meta = await resolveRouteMeta(pageModule, {
+              context: input.context,
+              params: input.params,
+              pathname: input.pathname,
+              request: input.request,
+            });
+            const markdown = await meta.markdown?.();
+            if (!markdown) {
+              return new Response("Not Found", { status: 404 });
+            }
+            return markdownResponse(markdown);
+          },
+        },
+      ];
+    },
+    async render(input) {
+      return (await renderAppRoute(input, options)).response;
+    },
+  };
+}
+
+function createMarkdownRenderer<TContext>(
+  options: AppRendererOptions<TContext> & {
+    markdownSources: Map<string, () => Promise<string>>;
+  }
+): FileRouteRenderer<TContext, RouteModule<TContext>> {
+  return {
+    name: "template-markdown",
+    accepts(route) {
+      return route.file.endsWith(".md");
+    },
+    generatedRoutes(route) {
+      return [
+        {
+          kind: "rsc",
+          method: "GET",
+          owner: route.id,
+          path: rscPathFor(route.path),
+          render: (input: RenderInput<TContext, RouteModule<TContext>>) =>
+            renderAppRscRoute(input, options),
+        },
+        {
+          kind: "markdown",
+          method: "GET",
+          owner: route.id,
+          path: toMarkdownPath(route.path),
+          async render() {
+            const getMarkdown = options.markdownSources.get(route.path);
+            if (!getMarkdown) {
+              return new Response("Not Found", { status: 404 });
+            }
+            return markdownResponse(await getMarkdown());
+          },
+        },
+      ];
+    },
+    async render(input) {
+      return (await renderAppRoute(input, options)).response;
+    },
+  };
+}
+
+function prepareMarkdownRoutes<TContext>(
+  contents: RouteGlobs<TContext>["contents"],
+  markdownAdapter: MarkdownAdapter,
+  options: { filterDrafts?: boolean }
+): PreparedMarkdownRoutes<TContext> {
+  const files: GlobFiles<RouteModule<TContext>> = {};
+  const markdownSources = new Map<string, () => Promise<string>>();
+
+  for (const [file, raw] of Object.entries(contents)) {
+    const sourceKey = routeSourceKey(file);
+    const sourceWithoutExt = sourceKey.replace(RE_MARKDOWN_EXT, "");
+    if (sourceWithoutExt.includes("[") || sourceWithoutExt.includes("]")) {
+      throw new Error(
+        `Markdown routes do not support dynamic segments in ${file}. Use a TSX route when params are needed.`
+      );
+    }
+
+    const path = routeFileToManifestPath(file, ".md").path;
+    const adapted = markdownAdapter(raw, path);
+    if (adapted.meta.draft && options.filterDrafts) {
+      continue;
+    }
+
+    files[sourceKey] = adapted.load as () => Promise<RouteModule<TContext>>;
+    markdownSources.set(path, () => Promise.resolve(raw));
+  }
+
+  return { files, markdownSources };
+}
+
+function appRouteFiles<TContext>(
+  appRoutes: AppRoute<TContext>[] | undefined
+): GlobFiles<RouteModule<TContext>> {
+  return Object.fromEntries(
+    (appRoutes ?? []).map((route) => [
+      programmaticRouteFile(route.path),
+      route.load,
+    ])
+  );
+}
+
+function createAppRouteManifest<TContext>(
+  globs: RouteGlobs<TContext>,
+  options: AppRendererOptions<TContext> & {
+    appRoutes?: AppRoute<TContext>[];
+    markdownAdapter: MarkdownAdapter;
+  }
+): {
+  manifest: RouteManifest<TContext, RouteModule<TContext>>;
+  markdownSources: Map<string, () => Promise<string>>;
+} {
+  const markdown = prepareMarkdownRoutes(
+    globs.contents,
+    options.markdownAdapter,
+    {
+      filterDrafts: import.meta.env.PROD,
+    }
+  );
+  const pageRenderer = createPageRenderer(options);
+  const markdownRenderer = createMarkdownRenderer({
+    ...options,
+    markdownSources: markdown.markdownSources,
+  });
+
+  const sources: RouteSource<TContext, RouteModule<TContext>>[] = [
+    {
+      files: routeSourceFiles(globs.pages, { excludeLayouts: true }),
+      renderer: pageRenderer,
+    },
+    {
+      files: markdown.files,
+      renderer: markdownRenderer,
+    },
+    {
+      files: appRouteFiles(options.appRoutes),
+      renderer: pageRenderer,
+    },
+    {
+      files: routeSourceFiles(globs.handlers),
+      routes: honoRoutes(),
+    },
+  ];
+
+  return {
+    manifest: createRouteManifest({ sources }) as RouteManifest<
+      TContext,
+      RouteModule<TContext>
+    >,
+    markdownSources: markdown.markdownSources,
+  };
+}
+
 async function collectRouteManifest<TContext = unknown>(
-  routes: Route<TContext>[],
+  routes: AppFileRoute<TContext>[],
   request: Request,
   context: TContext
 ): Promise<RouteManifestEntry[]> {
   const entries: RouteManifestEntry[] = [];
 
   for (const route of routes) {
-    const pageModule = await route.load();
+    const pageModule = await route.load?.();
+    if (!pageModule) {
+      continue;
+    }
     if (pageModule.enumerate) {
       entries.push(
         ...(await pageModule.enumerate({ context, request })).filter((entry) =>
@@ -194,24 +481,33 @@ export function createApp<TContext = unknown>({
       })
   );
 
-  const manifest = buildManifest<TContext>(globs, {
-    filterDrafts: import.meta.env.PROD,
-    markdownAdapter,
-    routes: appRoutes,
-  });
-
   const renderRsc = renderer.renderRsc;
   const renderHtml = renderer.renderHtml ?? defaultRenderHtml;
+  const { manifest, markdownSources } = createAppRouteManifest<TContext>(
+    globs,
+    {
+      site,
+      layouts: globs.layouts,
+      renderRsc,
+      renderHtml,
+      appRoutes,
+      markdownAdapter,
+    }
+  );
 
   // Global middleware
   app.use("*", async (c, next) => {
     c.set("site", site as SiteConfig);
-    c.set("markdownSources", manifest.markdownSources);
+    c.set("markdownSources", markdownSources);
     c.set("routeManifest", async () => {
       const context = createRequestContext
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
-      return collectRouteManifest(manifest.routes, c.req.raw, context);
+      return collectRouteManifest(
+        manifest.routes as AppFileRoute<TContext>[],
+        c.req.raw,
+        context
+      );
     });
     await next();
     if (
@@ -227,88 +523,10 @@ export function createApp<TContext = unknown>({
     return c.text("Internal Server Error", 500);
   });
 
-  // Page routes
-  for (const route of manifest.routes) {
-    app.get(route.path, async (c) => {
-      const context = createRequestContext
-        ? await createRequestContext(c.req.raw)
-        : (undefined as TContext);
-      const params = c.req.param();
-      const pathname = pathnameFromRoutePath(route.path, params);
-      const rscStream = await renderRouteToRscStream(
-        {
-          site,
-          route,
-          pathname,
-          request: c.req.raw,
-          context,
-          params,
-        },
-        renderRsc
-      );
-      const response = await renderHtmlResponse(
-        c.req.raw,
-        rscStream.stream,
-        renderHtml
-      );
-
-      if (rscStream.meta.cacheControl) {
-        response.headers.set("Cache-Control", rscStream.meta.cacheControl);
-      }
-
-      return response;
-    });
-
-    app.get(rscPathFor(route.path), async (c) => {
-      const context = createRequestContext
-        ? await createRequestContext(c.req.raw)
-        : (undefined as TContext);
-      const params = c.req.param();
-      const pathname = pathnameFromRoutePath(route.path, params);
-      const rscStream = await renderRouteToRscStream(
-        {
-          site,
-          route,
-          pathname,
-          request: c.req.raw,
-          context,
-          params,
-        },
-        renderRsc
-      );
-      return renderRscResponse(rscStream.stream);
-    });
-
-    // .md auto-generation
-    if (!hasDynamicRouteSegments(route.path)) {
-      app.get(toMarkdownPath(route.path), async (c) => {
-        const getMarkdown = manifest.markdownSources.get(route.path);
-        if (!getMarkdown) {
-          const context = createRequestContext
-            ? await createRequestContext(c.req.raw)
-            : (undefined as TContext);
-          const pageModule = await route.load();
-          const meta = await resolveRouteMeta(pageModule, {
-            context,
-            params: {},
-            pathname: pathnameFromRoutePath(route.path, {}),
-            request: c.req.raw,
-          });
-          const markdown = await meta.markdown?.();
-          if (!markdown) {
-            return new Response("Not Found", { status: 404 });
-          }
-          return markdownResponse(markdown);
-        }
-        return markdownResponse(await getMarkdown());
-      });
-    }
-  }
-
-  // Handler routes
-  for (const { path, app: handler } of manifest.handlers) {
-    app.route(path, handler);
-  }
+  mountFileRoutes(app, {
+    manifest,
+    createContext: createRequestContext,
+  });
 
   // Not found
   if (notFound) {

@@ -20,6 +20,11 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     environment: "node",
+    server: {
+      deps: {
+        inline: ["@yoshikouki/hono-file-router"],
+      },
+    },
     coverage: {
       enabled: true,
       provider: "v8",
