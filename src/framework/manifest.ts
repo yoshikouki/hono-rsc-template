@@ -1,3 +1,10 @@
+import {
+  hasDynamicRouteSegments as coreHasDynamicRouteSegments,
+  routePathsOverlap as coreRoutePathsOverlap,
+  routePathToShape as coreRoutePathToShape,
+  sortRoutesBySpecificity as coreSortRoutesBySpecificity,
+  routeFileToManifestPath as routeRootFileToManifestPath,
+} from "@yoshikouki/hono-file-router";
 import type { Hono } from "hono";
 import type { MarkdownAdapter } from "./content/markdown";
 import type {
@@ -22,21 +29,13 @@ export interface BuildManifestOptions<TContext = unknown> {
 }
 
 const RE_ROUTE_PREFIX = /^(?:\.\.?\/)*routes\//;
-const RE_TSX_EXT = /\.tsx$/;
-const RE_TS_EXT = /\.ts$/;
 const RE_MD_EXT = /\.md$/;
-const RE_TRAILING_INDEX = /(^|\/)index$/;
 const RE_LAYOUT_TSX_FILE = /(?:^|\/)layout\.tsx$/;
-const RE_DYNAMIC_SEGMENT = /^\[([A-Za-z_$][\w$]*)\]$/;
 const RSC_ROUTE_PREFIX = "/__rsc";
 
 interface ManifestPath {
   path: string;
   routeDirectory: string;
-}
-
-interface RoutePathEntry {
-  path: string;
 }
 
 interface RegisteredRoutePath {
@@ -50,121 +49,11 @@ function stripRoutePrefix(file: string): string {
   return file.replace(RE_ROUTE_PREFIX, "");
 }
 
-function stripExtension(
-  file: string,
-  extension: ".md" | ".ts" | ".tsx"
-): string {
-  if (extension === ".tsx") {
-    return file.replace(RE_TSX_EXT, "");
-  }
-  if (extension === ".ts") {
-    return file.replace(RE_TS_EXT, "");
-  }
-  return file.replace(RE_MD_EXT, "");
-}
-
-function segmentToRoutePath(segment: string, file: string): string {
-  const match = segment.match(RE_DYNAMIC_SEGMENT);
-  if (match) {
-    return `:${match[1]}`;
-  }
-
-  if (segment.includes("[") || segment.includes("]")) {
-    throw new Error(
-      `Unsupported dynamic route segment "${segment}" in ${file}. Only single segments like [id] are supported.`
-    );
-  }
-
-  return segment;
-}
-
-export function hasDynamicRouteSegments(path: string): boolean {
-  return path.split("/").some((segment) => segment.startsWith(":"));
-}
-
-export function routePathToShape(path: string): string {
-  const segments = path
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => (segment.startsWith(":") ? ":param" : segment));
-
-  return segments.length > 0 ? `/${segments.join("/")}` : "/";
-}
-
-function pathSegments(path: string): string[] {
-  return path.split("/").filter(Boolean);
-}
-
-function isDynamicSegment(segment: string): boolean {
-  return segment.startsWith(":");
-}
-
-export function routePathsOverlap(a: string, b: string): boolean {
-  const aSegments = pathSegments(a);
-  const bSegments = pathSegments(b);
-  if (aSegments.length !== bSegments.length) {
-    return false;
-  }
-
-  return aSegments.every((segment, index) => {
-    const other = bSegments[index];
-    return (
-      segment === other || isDynamicSegment(segment) || isDynamicSegment(other)
-    );
-  });
-}
-
-function compareRouteSpecificity(a: string, b: string): number {
-  const aSegments = pathSegments(a);
-  const bSegments = pathSegments(b);
-  const length = Math.min(aSegments.length, bSegments.length);
-
-  for (let i = 0; i < length; i += 1) {
-    const aDynamic = isDynamicSegment(aSegments[i]);
-    const bDynamic = isDynamicSegment(bSegments[i]);
-    if (aDynamic !== bDynamic) {
-      return aDynamic ? 1 : -1;
-    }
-  }
-
-  return bSegments.length - aSegments.length;
-}
-
-export function sortRoutesBySpecificity<T extends RoutePathEntry>(
-  routes: T[]
-): T[] {
-  return routes
-    .map((route, index) => ({ index, route }))
-    .sort((a, b) => {
-      const specificity = compareRouteSpecificity(a.route.path, b.route.path);
-      return specificity === 0 ? a.index - b.index : specificity;
-    })
-    .map(({ route }) => route);
-}
-
-function dirname(path: string): string {
-  const index = path.lastIndexOf("/");
-  return index === -1 ? "" : path.slice(0, index);
-}
-
 export function routeFileToManifestPath(
   file: string,
-  extension: ".ts" | ".tsx"
+  _extension: ".ts" | ".tsx"
 ): ManifestPath {
-  const withoutPrefix = stripRoutePrefix(file);
-  const withoutExt = stripExtension(withoutPrefix, extension);
-  const withoutIndex = withoutExt.replace(RE_TRAILING_INDEX, "");
-  const pathSegments = withoutIndex
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => segmentToRoutePath(segment, file));
-
-  return {
-    path: pathSegments.length > 0 ? `/${pathSegments.join("/")}` : "/",
-    routeDirectory: RE_TRAILING_INDEX.test(withoutExt)
-      ? withoutIndex
-      : dirname(withoutExt),
-  };
+  return routeRootFileToManifestPath(stripRoutePrefix(file));
 }
 
 function fileToPath(file: string): ManifestPath {
@@ -177,13 +66,31 @@ function handlerFileToPath(file: string): string {
 
 function contentFileToPath(file: string): string {
   const withoutPrefix = stripRoutePrefix(file);
-  const withoutExt = stripExtension(withoutPrefix, ".md");
+  const withoutExt = withoutPrefix.replace(RE_MD_EXT, "");
   if (withoutExt.includes("[") || withoutExt.includes("]")) {
     throw new Error(
       `Markdown routes do not support dynamic segments in ${file}. Use a TSX route when params are needed.`
     );
   }
   return `/${withoutExt}`;
+}
+
+export function hasDynamicRouteSegments(path: string): boolean {
+  return coreHasDynamicRouteSegments(path);
+}
+
+export function routePathsOverlap(a: string, b: string): boolean {
+  return coreRoutePathsOverlap(a, b);
+}
+
+export function routePathToShape(path: string): string {
+  return coreRoutePathToShape(path);
+}
+
+export function sortRoutesBySpecificity<T extends { path: string }>(
+  routes: T[]
+): T[] {
+  return coreSortRoutesBySpecificity(routes);
 }
 
 export function toMarkdownPath(path: string): string {
@@ -196,7 +103,7 @@ function rscPathFor(path: string): string {
 
 export function generatedRoutePathsForRoute(path: string): string[] {
   const paths = [rscPathFor(path)];
-  if (!hasDynamicRouteSegments(path)) {
+  if (!coreHasDynamicRouteSegments(path)) {
     paths.push(toMarkdownPath(path));
   }
   return paths;
@@ -247,7 +154,7 @@ function findOverlappingRoute(
   path: string,
   registered: RegisteredRoutePath[]
 ): RegisteredRoutePath | undefined {
-  return registered.find((entry) => routePathsOverlap(path, entry.path));
+  return registered.find((entry) => coreRoutePathsOverlap(path, entry.path));
 }
 
 function pageLikeRoutePathEntries(
@@ -288,14 +195,16 @@ function generatedRoutesConflict(
   a: RegisteredRoutePath,
   b: RegisteredRoutePath
 ): boolean {
-  if (!((a.generated || b.generated) && routePathsOverlap(a.path, b.path))) {
+  if (
+    !((a.generated || b.generated) && coreRoutePathsOverlap(a.path, b.path))
+  ) {
     return false;
   }
 
   if (
     a.generated &&
     b.generated &&
-    routePathsOverlap(a.ownerPath, b.ownerPath) &&
+    coreRoutePathsOverlap(a.ownerPath, b.ownerPath) &&
     !(isRscRoute(a.ownerPath) || isRscRoute(b.ownerPath))
   ) {
     return false;
@@ -333,7 +242,7 @@ function buildHandlerEntries(
 
   for (const [file, app] of Object.entries(globHandlers)) {
     const path = handlerFileToPath(file);
-    const shape = routePathToShape(path);
+    const shape = coreRoutePathToShape(path);
     const overlappingRoute = findOverlappingRoute(
       path,
       registeredPageLikeRoutes
@@ -352,7 +261,7 @@ function buildHandlerEntries(
     handlers.push({ path, app });
   }
 
-  return sortRoutesBySpecificity(handlers);
+  return coreSortRoutesBySpecificity(handlers);
 }
 
 export function buildManifest<TContext = unknown>(
@@ -371,7 +280,7 @@ export function buildManifest<TContext = unknown>(
     }
 
     const { path, routeDirectory } = fileToPath(file);
-    const shape = routePathToShape(path);
+    const shape = coreRoutePathToShape(path);
     if (seen.has(shape)) {
       throw new Error(
         `Duplicate route "${path}": ${seen.get(shape)} and ${file}`
@@ -396,7 +305,7 @@ export function buildManifest<TContext = unknown>(
   // md contents
   for (const [file, raw] of Object.entries(globs.contents)) {
     const path = contentFileToPath(file);
-    const shape = routePathToShape(path);
+    const shape = coreRoutePathToShape(path);
     if (seen.has(shape)) {
       throw new Error(
         `Duplicate route "${path}": ${seen.get(shape)} and ${file}`
@@ -427,7 +336,7 @@ export function buildManifest<TContext = unknown>(
   // programmatic routes
   for (const appRoute of opts.routes ?? []) {
     const { path, load } = appRoute;
-    const shape = routePathToShape(path);
+    const shape = coreRoutePathToShape(path);
     if (seen.has(shape)) {
       throw new Error(
         `Duplicate route "${path}": ${seen.get(shape)} and programmatic route`
@@ -450,7 +359,7 @@ export function buildManifest<TContext = unknown>(
   }
 
   return {
-    routes: sortRoutesBySpecificity(routes),
+    routes: coreSortRoutesBySpecificity(routes),
     markdownSources,
     handlers: buildHandlerEntries(globs.handlers, registeredPageLikeRoutes),
   };

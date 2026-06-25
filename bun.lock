@@ -6,6 +6,7 @@
       "name": "hono-rsc-template",
       "dependencies": {
         "@tailwindcss/vite": "^4.3.1",
+        "@yoshikouki/hono-file-router": "file:../hono-kit/packages/hono-file-router",
         "hono": "^4.12.27",
         "react": "^19.2.5",
         "react-compiler-runtime": "^1.0.0",
@@ -320,6 +321,8 @@
     "@vitest/spy": ["@vitest/spy@4.1.9", "", {}, "sha512-fHpsS6mIi+PiEW+vcRVOMkX1oSaPKne3VOclSFICPcGOmfKgXPU5iAah+wcNcj2xPrCCmfq99IDGf+EojhhvhA=="],
 
     "@vitest/utils": ["@vitest/utils@4.1.9", "", { "dependencies": { "@vitest/pretty-format": "4.1.9", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-A51o8ymO5PpqlWNnBP9ZHPXDIpuMtTLlGSjN7la4US+LJzoUMyhwjA5QXlm39JexgwHKW4Xjs8Z2d3dLCXOeuA=="],
+
+    "@yoshikouki/hono-file-router": ["@yoshikouki/hono-file-router@file:../hono-kit/packages/hono-file-router", { "devDependencies": { "hono": "^4.12.27", "typescript": "^6.0.3" }, "peerDependencies": { "hono": ">=4.0.0" } }],
 
     "assertion-error": ["assertion-error@2.0.1", "", {}, "sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA=="],
 
