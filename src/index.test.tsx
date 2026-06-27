@@ -41,6 +41,20 @@ describe("createApp", () => {
     expect(res.headers.get("Content-Type")).toContain("text/html");
   });
 
+  it("serves nested dynamic Hono route modules", async () => {
+    const app = testApp();
+
+    const html = await app.request("/posts/alpha/detail");
+    expect(html.status).toBe(200);
+    expect(html.headers.get("Content-Type")).toContain("text/html");
+
+    const flight = await app.request("/posts/alpha/detail", {
+      headers: rscHeaders,
+    });
+    expect(flight.status).toBe(200);
+    expect(flight.headers.get("Content-Type")).toContain("text/x-component");
+  });
+
   it("serves Markdown as an RSC-rendered page", async () => {
     const res = await testApp().request("/hello");
     expect(res.status).toBe(200);
