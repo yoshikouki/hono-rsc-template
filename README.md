@@ -5,12 +5,12 @@ A minimal template for running **React Server Components** on **Cloudflare Worke
 ## Stack
 
 - **React 19** — Server Components + Streaming SSR
-- **Hono** — Handles all routing (pages + API)
+- **Hono** — Route modules are plain Hono apps
 - **`@vitejs/plugin-rsc`** — RSC protocol implementation
-- **`@yoshikouki/hono-file-router`** — File route manifesting and Hono mounting
-- **`@yoshikouki/hono-rsc-renderer`** — Browser and SSR RSC runtime entries
+- **`@yoshikouki/hono-file-router`** — Mounts file-based Hono route modules
+- **`@yoshikouki/hono-rsc-renderer`** — Provides `c.render()`, browser entry, and SSR entry
 - **Same-path Flight** — HTML and RSC payloads share URLs and vary by `RSC` / `Accept`
-- **Cloudflare Workers** — edge runtime
+- **Cloudflare Workers** — Edge runtime
 
 ## Get Started
 
@@ -28,108 +28,96 @@ bun run deploy   # deploy to Cloudflare Workers
 
 | Environment | Role | Entry |
 |---|---|---|
-| `rsc` | RSC rendering + all routing | `src/index.tsx` |
-| `ssr` | Convert RSC stream → initial HTML | `@yoshikouki/hono-rsc-renderer/entry.ssr` |
+| `rsc` | RSC rendering + routing | `src/index.tsx` |
+| `ssr` | Convert RSC stream to initial HTML | `@yoshikouki/hono-rsc-renderer/entry.ssr` |
 | `client` | Fetch same-path Flight and hydrate | `@yoshikouki/hono-rsc-renderer/entry.browser` |
 
-### Request Flow
+Initial page loads and Flight requests hit the same route:
 
-**Initial page load (HTML)**
-
-```
-Browser → GET /
-  → src/index.tsx: createApp() → Hono handles route
-  → render.tsx: renderRouteToRscStream() → RSC stream
-  → @yoshikouki/hono-rsc-renderer/entry.ssr
-  → Response: Content-Type: text/html
+```txt
+GET /about
+  -> src/index.tsx
+  -> @yoshikouki/hono-file-router mounts src/routes/about/index.tsx
+  -> route calls c.render(<Page />, { title, description })
+  -> @yoshikouki/hono-rsc-renderer returns HTML or Flight
 ```
 
-**Hydration payload**
-
-```
-Browser → GET /
-  headers: RSC: 1, Accept: text/x-component
-  → server.ts: same route → returns RSC stream directly
-  → Response: Content-Type: text/x-component
-```
-
-**Hydration**
-
-```
-Browser: @yoshikouki/hono-rsc-renderer/entry.browser → hydrateRoot()
-```
-
-### RSC Payload Routing
-
-HTML and RSC payloads use the same URL:
-
-- `/about` → HTML response for the initial render
-- `/about` with `RSC: 1` and `Accept: text/x-component` → RSC payload used for hydration and RSC refreshes
-
-Responses set `Vary: RSC, Accept` because the same path can return either HTML or Flight. RSC responses are returned with `Cache-Control: private, no-store`; route-level `cacheControl` applies to HTML responses only.
+Requests with `RSC: 1` or `Accept: text/x-component` return `text/x-component` with `Cache-Control: private, no-store`. Normal browser requests return `text/html`. Both response shapes set `Vary: RSC, Accept`.
 
 ## File Structure
 
-```
+```txt
 src/
-├── site.tsx              # App-layer config (SiteConfig, routeGlobs, notFound)
-├── index.tsx             # RSC env entry
-├── framework/            # Framework layer — no site-specific knowledge
-│   ├── types.ts          # All shared types
-│   ├── manifest.ts       # Template route helpers
-│   ├── content/          # Frontmatter parser, markdown adapter, response helpers
-│   ├── document.tsx      # HTML document shell
-│   ├── render.tsx        # Layout composition + RSC stream
-│   └── server.ts         # Hono app factory + same-path Flight handling
+├── index.tsx             # RSC env entry and Hono app composition
+├── site.tsx              # Site config, Markdown files, static site manifest
+├── components/           # Shared React components and document shell
 ├── lib/
-│   └── markdown/         # MD → React rendering (remark/rehype + Tailwind components)
-├── routes/               # File-based routing
-│   ├── index.tsx         # / (Home page)
-│   ├── layout.tsx        # Root layout
-│   ├── hello.md          # /hello (Markdown page)
-│   ├── about/            # /about (page + layout)
-│   ├── healthz.ts        # /healthz handler
+│   └── markdown/         # Frontmatter, raw Markdown responses, Markdown routes
+├── routes/               # File-based Hono route modules
+│   ├── index.tsx         # /
+│   ├── about/index.tsx   # /about
+│   ├── hello.md          # /hello and /hello.md
+│   ├── healthz.ts        # /healthz
 │   ├── robots.txt.ts     # /robots.txt
 │   ├── sitemap.xml.ts    # /sitemap.xml
 │   ├── llms.txt.ts       # /llms.txt
 │   └── speculationrules.json.ts
-├── components/           # Client Components ("use client")
 └── bindings.ts           # Cloudflare bindings type definitions
 ```
 
 ## Adding a Page
 
-Create `src/routes/my-page.tsx`:
+Create a Hono route module under `src/routes`:
 
 ```tsx
-import type { RouteMeta } from "@/framework/types";
+import { Hono } from "hono";
+import { AppLayout } from "@/components/app-layout";
 
-export const resolveMeta = (): RouteMeta => ({
-  title: "My Page",
-  description: "About my page",
-});
-
-export default function MyPage() {
+function MyPage() {
   return <main>Hello from My Page</main>;
 }
+
+const app = new Hono();
+
+app.get("/", (c) =>
+  c.render(
+    <AppLayout>
+      <MyPage />
+    </AppLayout>,
+    {
+      title: "My Page",
+      description: "About my page",
+    }
+  )
+);
+
+export default app;
 ```
 
-That's it. No manual registration required.
+`src/routes/my-page.tsx` becomes `/my-page`. `src/routes/posts/[id].tsx` becomes `/posts/:id`, and params are available through `c.req.param()`.
 
-## Customizing the Site
+## Layout And Metadata
 
-Edit `src/site.tsx` to configure your site:
+Layouts are ordinary React components in `src/components` or feature folders. Import them from route modules and compose them explicitly.
 
-```tsx
-export const site: SiteConfig = {
-  baseUrl: "https://your-domain.com",
-  name: "Your Site Name",
-  lang: "en",
-  // optional: formatTitle, defaultJsonLd, head, etc.
-};
-```
+Document metadata is passed through `c.render()` props. `src/index.tsx` wraps rendered content with `src/components/document.tsx`, which reads props such as `title`, `description`, `noindex`, `ogImage`, and `jsonLd`.
 
-## Using Cloudflare Bindings (KV, D1, R2)
+## Markdown
+
+Markdown content lives in `src/routes/**/*.md`. The template turns each Markdown file into:
+
+- `/hello` — rendered through RSC
+- `/hello.md` — raw Markdown with `text/markdown`
+
+Markdown helpers are intentionally under `src/lib/markdown`, not a framework layer. Frontmatter currently supports `title`, `description`, `date`, `draft`, and comma-separated `tags`.
+
+## Site Index Endpoints
+
+`src/site.tsx` exports `siteManifest`, an explicit list used by `sitemap.xml.ts` and `llms.txt.ts`. Static route entries are written directly there, and Markdown entries are derived from frontmatter.
+
+For database or CMS routes, add normal Hono handlers and update the relevant site-index endpoint or manifest source in application code.
+
+## Using Cloudflare Bindings
 
 1. Declare the binding in `wrangler.toml`:
 
@@ -147,122 +135,10 @@ export interface Env {
 }
 ```
 
-3. Use it via `c.env` in any Hono route handler.
-
-## Framework Extension Points
-
-### Programmatic Routes (DB/CMS-driven pages)
-
-Pages that don't come from the filesystem — e.g. items fetched from a database or CMS — can be supplied as `AppRoute[]` to `createApp()`:
-
-```tsx
-createApp({
-  site,
-  globs: routeGlobs,
-  routes: [
-    { path: "/books/123", load: () => import("./BookPage") },
-  ],
-});
-```
-
-The loaded page module must export `resolveMeta`. Programmatic routes appear in `routeManifest()` (used by the sitemap handler), inherit the root layout chain, and support `.md` auto-generation through `resolveMeta().markdown`.
-
-### Request-time metadata
-
-Page metadata is resolved when a page or site-index handler needs it, not during route graph construction:
-
-```tsx
-import type { RouteContext, RouteMeta } from "@/framework/types";
-
-export async function resolveMeta(
-  _ctx: RouteContext
-): Promise<RouteMeta> {
-  return {
-    title: "Book 123",
-    description: "Loaded at request time",
-    cacheControl: "public, max-age=60",
-  };
-}
-```
-
-For site-index endpoints such as sitemap or `llms.txt`, dynamic lists can be supplied by `enumerate()`:
-
-```tsx
-import type { RouteManifestEntry } from "@/framework/types";
-
-export async function enumerate(): Promise<RouteManifestEntry[]> {
-  return [
-    { path: "/books/123", title: "Book 123" },
-    { path: "/books/draft", title: "Draft Book", draft: true },
-  ];
-}
-```
-
-Draft entries returned from `enumerate()` are excluded from `routeManifest()` in production.
-
-Filename routes support single dynamic segments using Next.js-style brackets:
-
-```txt
-src/routes/books/[id]/index.tsx -> /books/:id
-src/routes/books/[id]/reviews/[reviewId].tsx -> /books/:id/reviews/:reviewId
-src/routes/docs/[...slug].tsx -> /docs/:slug{.+}
-```
-
-Dynamic params are available from both `PageProps.params` and `RouteContext.params`.
-Markdown content routes are static-only; dynamic Markdown files such as `src/routes/blog/[slug].md` fail during manifest construction.
-Dynamic page routes should use `.tsx` pages or programmatic routes.
-Generated `.md` endpoints are available only for static page-like routes, so a dynamic route such as `/books/:id` does not generate `/books/foo.md`.
-Optional segments such as `[[slug]]` are intentionally unsupported and fail during manifest construction.
-Dynamic routes without `enumerate()` are excluded from `routeManifest()` because there is no concrete URL to publish in sitemap-like endpoints.
-
-### createRequestContext (per-request data)
-
-Thread request-derived data (auth, cookies, locale, …) through to every page and layout via `props.context`:
-
-```tsx
-// src/site.tsx — add createRequestContext to createApp call in src/index.tsx
-export function createRequestContext(req: Request) {
-  return { user: parseUserFromCookie(req.headers.get("Cookie") ?? "") };
-}
-```
-
-```tsx
-// a page
-export default function Page({ context }: PageProps<{ user: string }>) {
-  return <main>Hello {context.user}</main>;
-}
-```
-
-### c.var.site + manifest-driven handlers
-
-Every Hono handler route automatically has access to `c.var.site` (the `SiteConfig`), `c.var.routeManifest()` and `c.var.markdownSources`. The built-in sitemap helper demonstrates this pattern:
-
-```ts
-// src/routes/sitemap.xml.ts
-import { createSitemapApp } from "@/framework/handlers/sitemap";
-export default createSitemapApp();
-// optional: createSitemapApp({ filter: (e) => !e.path.startsWith("/draft") })
-```
-
-The built-in sitemap handler does not set `Cache-Control` by default.
-
-### SiteConfig: speculationRulesPath, themeColor, htmlAttributes
-
-```tsx
-export const site: SiteConfig = {
-  // Adds Speculation-Rules header to every HTML response
-  speculationRulesPath: "/speculationrules.json",
-  // Adds <meta name="theme-color">
-  themeColor: "#000000",
-  // Adds attributes to <html> (e.g. dark-mode class)
-  htmlAttributes: (ctx) => ({ "data-theme": ctx.theme }),
-  // head can also be a function for per-request rendering
-  head: (ctx) => <link rel="alternate" hrefLang={ctx.lang} href="..." />,
-};
-```
+3. Use it through `c.env` in any Hono route handler.
 
 ## Limitations
 
-- **Server Actions** (`"use server"`) are not implemented. Use Hono RPC (`.ts` handler routes) instead.
+- Server Actions (`"use server"`) are not implemented. Use Hono handlers instead.
 - Initial hydration performs a follow-up same-path Flight request instead of using an inline RSC payload.
 - Initial HTML and Flight are separate renders. Keep initial client component output deterministic, and move browser-time values such as clocks into effects after hydration.

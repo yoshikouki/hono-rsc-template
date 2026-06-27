@@ -1,42 +1,36 @@
-import type { ReactNode } from "react";
-import type { SiteConfig } from "./types";
+import type { JSX, ReactNode } from "react";
+import type { SiteConfig } from "@/site";
 
-export interface DocumentOptions<TContext = unknown> {
-  body: ReactNode;
-  context?: TContext;
+export interface DocumentProps {
+  children: ReactNode;
   description?: string;
   jsonLd?: unknown[];
   noindex?: boolean;
   ogImage?: string;
   pathname: string;
+  site: SiteConfig;
   title: string;
 }
 
-export function renderDocument<TContext = unknown>(
-  site: SiteConfig<TContext>,
-  {
-    title,
-    description,
-    pathname,
-    body,
-    jsonLd = [],
-    ogImage,
-    noindex,
-    context,
-  }: DocumentOptions<TContext>
-) {
+export function Document({
+  children,
+  description,
+  jsonLd = [],
+  noindex,
+  ogImage,
+  pathname,
+  site,
+  title,
+}: DocumentProps) {
   const canonical = `${site.baseUrl}${pathname}`;
   const resolvedOgImage = ogImage || site.defaultOgImage;
   const documentTitle = site.formatTitle
     ? site.formatTitle(title, pathname)
     : title;
-  const resolvedContext = context as TContext;
-  const htmlAttrs = site.htmlAttributes?.(resolvedContext) ?? {};
-  const resolvedHead =
-    typeof site.head === "function" ? site.head(resolvedContext) : site.head;
+  const htmlAttributes = site.htmlAttributes?.() ?? {};
 
   return (
-    <html lang={site.lang ?? "ja"} {...htmlAttrs}>
+    <html lang={site.lang ?? "ja"} {...htmlAttributes}>
       <head>
         <meta charSet="utf-8" />
         <meta content="width=device-width, initial-scale=1" name="viewport" />
@@ -51,7 +45,6 @@ export function renderDocument<TContext = unknown>(
         <link href={canonical} rel="canonical" />
         {noindex ? <meta content="noindex,nofollow" name="robots" /> : null}
 
-        {/* Open Graph */}
         <meta content={title} property="og:title" />
         {description ? (
           <meta content={description} property="og:description" />
@@ -66,7 +59,6 @@ export function renderDocument<TContext = unknown>(
           <meta content={resolvedOgImage} property="og:image" />
         ) : null}
 
-        {/* Twitter */}
         {site.twitterSite || site.twitterCreator ? (
           <meta content="summary_large_image" name="twitter:card" />
         ) : null}
@@ -77,19 +69,21 @@ export function renderDocument<TContext = unknown>(
           <meta content={site.twitterCreator} name="twitter:creator" />
         ) : null}
 
-        {jsonLd.map((item, i) => (
+        {jsonLd.map((item, index) => (
           <script
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD requires inline script injection
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD requires inline script injection.
             dangerouslySetInnerHTML={{ __html: JSON.stringify(item) }}
-            // biome-ignore lint/suspicious/noArrayIndexKey: JSON-LD items are static per render and have no stable id
-            key={i}
+            // biome-ignore lint/suspicious/noArrayIndexKey: JSON-LD items are static per render and have no stable id.
+            key={index}
             type="application/ld+json"
           />
         ))}
 
-        {resolvedHead}
+        {site.head}
       </head>
-      <body className={site.bodyClassName}>{body}</body>
+      <body className={site.bodyClassName}>{children}</body>
     </html>
   );
 }
+
+export type HtmlAttributes = JSX.IntrinsicElements["html"];

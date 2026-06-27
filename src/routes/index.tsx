@@ -1,13 +1,9 @@
+import { Hono } from "hono";
+import { AppLayout } from "@/components/app-layout";
 import { ClickCounter } from "@/components/click-counter";
 import { ClientClock } from "@/components/client-clock";
-import type { RouteMeta } from "@/framework/types";
 
-export const resolveMeta = (): RouteMeta => ({
-  title: "Home",
-  description: "A Hono RSC template app",
-});
-
-export default function HomePage() {
+function HomePage() {
   return (
     <div>
       <h1 className="mb-4 font-bold text-3xl">Welcome</h1>
@@ -28,3 +24,19 @@ export default function HomePage() {
     </div>
   );
 }
+
+const app = new Hono();
+
+app.get("/", (c) =>
+  c.render(
+    <AppLayout>
+      <HomePage />
+    </AppLayout>,
+    {
+      description: "A Hono RSC template app",
+      title: "Home",
+    }
+  )
+);
+
+export default app;

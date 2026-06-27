@@ -31,7 +31,12 @@ export default defineConfig(({ mode }) => ({
     coverage: {
       enabled: true,
       provider: "v8",
-      include: ["src/framework/**", "src/lib/**", "src/site.tsx"],
+      include: [
+        "src/index.tsx",
+        "src/components/**",
+        "src/lib/**",
+        "src/site.tsx",
+      ],
       reporter: ["text"],
     },
   },

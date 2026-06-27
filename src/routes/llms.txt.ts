@@ -1,11 +1,10 @@
 import { Hono } from "hono";
-import type { AppEnv } from "@/framework/types";
+import { siteManifest } from "@/site";
 
-const app = new Hono<AppEnv>();
+const app = new Hono();
 
-app.get("/", async (c) => {
-  const manifest = await c.var.routeManifest();
-  const lines = manifest.map(
+app.get("/", () => {
+  const lines = siteManifest.map(
     (entry) => `- [${entry.title}](${entry.path}): ${entry.description ?? ""}`
   );
   const body = ["# Site Pages", "", ...lines].join("\n");

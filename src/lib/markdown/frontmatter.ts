@@ -41,7 +41,7 @@ export function parseFrontmatter(raw: string): Frontmatter {
   const tags = meta.tags
     ? meta.tags
         .split(",")
-        .map((t) => t.trim())
+        .map((tag) => tag.trim())
         .filter(Boolean)
     : undefined;
 
