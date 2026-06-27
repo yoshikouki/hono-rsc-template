@@ -6,8 +6,8 @@
       "name": "hono-rsc-template",
       "dependencies": {
         "@tailwindcss/vite": "^4.3.1",
-        "@yoshikouki/hono-file-router": "file:../hono-kit/packages/hono-file-router",
-        "@yoshikouki/hono-rsc-renderer": "file:../hono-kit/packages/hono-rsc-renderer",
+        "@yoshikouki/hono-file-router": "github:yoshikouki/hono-kit#main",
+        "@yoshikouki/hono-rsc-renderer": "github:yoshikouki/hono-kit#main",
         "hono": "^4.12.27",
         "react": "^19.2.5",
         "react-compiler-runtime": "^1.0.0",
@@ -299,10 +299,6 @@
 
     "@types/ms": ["@types/ms@2.1.0", "", {}, "sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA=="],
 
-    "@types/react": ["@types/react@19.2.17", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw=="],
-
-    "@types/react-dom": ["@types/react-dom@19.2.3", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ=="],
-
     "@types/unist": ["@types/unist@3.0.3", "", {}, "sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q=="],
 
     "@ungap/structured-clone": ["@ungap/structured-clone@1.3.0", "", {}, "sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g=="],
@@ -327,9 +323,9 @@
 
     "@vitest/utils": ["@vitest/utils@4.1.9", "", { "dependencies": { "@vitest/pretty-format": "4.1.9", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-A51o8ymO5PpqlWNnBP9ZHPXDIpuMtTLlGSjN7la4US+LJzoUMyhwjA5QXlm39JexgwHKW4Xjs8Z2d3dLCXOeuA=="],
 
-    "@yoshikouki/hono-file-router": ["@yoshikouki/hono-file-router@file:../hono-kit/packages/hono-file-router", { "devDependencies": { "hono": "^4.12.27", "typescript": "^6.0.3" }, "peerDependencies": { "hono": ">=4.0.0" } }],
+    "@yoshikouki/hono-file-router": ["hono-kit@github:yoshikouki/hono-kit#9653c8a", {}, "yoshikouki-hono-kit-9653c8a", "sha512-4LrofhB4e1SyPxwhM8WCNRtdOVociKh9KNB0WKx9yV5CuySgCoIFnoS/Qcb9ZqfHHBPprKJ0IonQRxdjcaA+Hw=="],
 
-    "@yoshikouki/hono-rsc-renderer": ["@yoshikouki/hono-rsc-renderer@file:../hono-kit/packages/hono-rsc-renderer", { "devDependencies": { "@types/react": "^19.2.15", "@types/react-dom": "^19.2.3", "@vitejs/plugin-rsc": "^0.5.25", "hono": "^4.12.27", "react": "^19.2.5", "react-dom": "^19.2.5", "typescript": "^6.0.3", "vite": "^8.1.0" }, "peerDependencies": { "@vitejs/plugin-rsc": ">=0.5.0", "hono": ">=4.0.0", "react": ">=19.0.0", "react-dom": ">=19.0.0" } }],
+    "@yoshikouki/hono-rsc-renderer": ["hono-kit@github:yoshikouki/hono-kit#9653c8a", {}, "yoshikouki-hono-kit-9653c8a", "sha512-4LrofhB4e1SyPxwhM8WCNRtdOVociKh9KNB0WKx9yV5CuySgCoIFnoS/Qcb9ZqfHHBPprKJ0IonQRxdjcaA+Hw=="],
 
     "assertion-error": ["assertion-error@2.0.1", "", {}, "sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA=="],
 
@@ -368,8 +364,6 @@
     "cookie": ["cookie@1.1.1", "", {}, "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ=="],
 
     "cross-spawn": ["cross-spawn@7.0.6", "", { "dependencies": { "path-key": "^3.1.0", "shebang-command": "^2.0.0", "which": "^2.0.1" } }, "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA=="],
-
-    "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
 
     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
 

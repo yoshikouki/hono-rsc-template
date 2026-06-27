@@ -44,6 +44,8 @@ GET /about
 
 Requests with `RSC: 1` or `Accept: text/x-component` return `text/x-component` with `Cache-Control: private, no-store`. Normal browser requests return `text/html`. Both response shapes set `Vary: RSC, Accept`.
 
+The `@yoshikouki/hono-*` dependencies point at the GitHub `yoshikouki/hono-kit` repository. Because Bun installs Git dependencies from the repository root, `vite.config.ts` aliases those package names to the corresponding package sources under `node_modules/@yoshikouki/*/packages/*/src`.
+
 ## File Structure
 
 ```txt

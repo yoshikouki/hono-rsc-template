@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
-    "@yoshikouki/hono-file-router": "file:../hono-kit/packages/hono-file-router",
-    "@yoshikouki/hono-rsc-renderer": "file:../hono-kit/packages/hono-rsc-renderer",
+    "@yoshikouki/hono-file-router": "github:yoshikouki/hono-kit#main",
+    "@yoshikouki/hono-rsc-renderer": "github:yoshikouki/hono-kit#main",
     "hono": "^4.12.27",
     "react": "^19.2.5",
     "react-compiler-runtime": "^1.0.0",
