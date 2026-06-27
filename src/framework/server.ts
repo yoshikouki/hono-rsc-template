@@ -9,7 +9,6 @@ import {
   type RouteManifest,
   type RouteSource,
 } from "@yoshikouki/hono-file-router";
-import { honoRoutes } from "@yoshikouki/hono-file-router/hono-routes";
 import { Hono } from "hono";
 import {
   createMarkdownAdapter,
@@ -19,6 +18,7 @@ import { markdownResponse } from "./content/response";
 import {
   hasDynamicRouteSegments,
   resolveLayoutChain,
+  routeFileToLayoutDirectory,
   routeFileToManifestPath,
   toMarkdownPath,
 } from "./manifest";
@@ -37,27 +37,11 @@ import type {
 const RSC_CONTENT_TYPE = "text/x-component;charset=utf-8";
 const HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 const RSC_CACHE_CONTROL = "private, no-store";
-const RSC_ROUTE_PREFIX = "/__rsc";
+const RSC_VARY_HEADERS = ["RSC", "Accept"];
 const RE_HONO_CATCH_ALL_PARAM = /^([A-Za-z_$][\w$]*)\{\.\+\}$/;
 const RE_LAYOUT_TSX_FILE = /(?:^|\/)layout\.tsx$/;
 const RE_MARKDOWN_EXT = /\.md$/;
 const RE_ROUTE_PREFIX = /^(?:\.\.?\/)*routes\//;
-
-export function rscPathFor(path: string): string {
-  return path === "/" ? RSC_ROUTE_PREFIX : `${RSC_ROUTE_PREFIX}${path}`;
-}
-
-export function pagePathFromRscPath(pathname: string): string | null {
-  if (pathname === RSC_ROUTE_PREFIX || pathname === `${RSC_ROUTE_PREFIX}/`) {
-    return "/";
-  }
-
-  if (!pathname.startsWith(`${RSC_ROUTE_PREFIX}/`)) {
-    return null;
-  }
-
-  return pathname.slice(RSC_ROUTE_PREFIX.length);
-}
 
 export function pathnameFromRoutePath(
   routePath: string,
@@ -105,12 +89,31 @@ async function defaultRenderHtml(
   rscStream: ReadableStream,
   options: { signal: AbortSignal }
 ): Promise<ReadableStream> {
-  // import.meta.viteRsc.import is statically transformed by @vitejs/plugin-rsc
-  // and must be written in this exact form
+  // import.meta.viteRsc.import is statically transformed by @vitejs/plugin-rsc.
   const ssrEntry = await import.meta.viteRsc.import<
-    typeof import("./entry.ssr.tsx")
-  >("./entry.ssr.tsx", { environment: "ssr" });
+    typeof import("@yoshikouki/hono-rsc-renderer/entry.ssr")
+  >("@yoshikouki/hono-rsc-renderer/entry.ssr", { environment: "ssr" });
   return ssrEntry.renderHtml(rscStream, options);
+}
+
+function appendVary(headers: Headers, names: string[]): void {
+  const existing = new Set(
+    (headers.get("Vary") ?? "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
+  );
+  for (const name of names) {
+    existing.add(name);
+  }
+  headers.set("Vary", [...existing].join(", "));
+}
+
+function isRscRequest(request: Request): boolean {
+  const accept = request.headers.get("Accept") ?? "";
+  return (
+    request.headers.get("RSC") === "1" || accept.includes("text/x-component")
+  );
 }
 
 async function renderHtmlResponse(
@@ -119,11 +122,13 @@ async function renderHtmlResponse(
   renderHtml: RenderHtml
 ): Promise<Response> {
   const htmlStream = await renderHtml(rscStream, { signal: request.signal });
-  return new Response(htmlStream, {
+  const response = new Response(htmlStream, {
     headers: {
       "Content-Type": HTML_CONTENT_TYPE,
     },
   });
+  appendVary(response.headers, RSC_VARY_HEADERS);
+  return response;
 }
 
 function renderRscResponse(
@@ -133,6 +138,7 @@ function renderRscResponse(
   const headers = new Headers(init.headers);
   headers.set("Content-Type", RSC_CONTENT_TYPE);
   headers.set("Cache-Control", RSC_CACHE_CONTROL);
+  appendVary(headers, RSC_VARY_HEADERS);
   return new Response(rscStream, { ...init, headers });
 }
 
@@ -192,7 +198,10 @@ function renderableRoute<TContext>(
   }
   return {
     load: route.load,
-    layouts: resolveLayoutChain(route.routeDirectory, layouts),
+    layouts: resolveLayoutChain(
+      routeFileToLayoutDirectory(route.file),
+      layouts
+    ),
   };
 }
 
@@ -214,6 +223,14 @@ async function renderAppRoute<TContext>(
     },
     options.renderRsc
   );
+
+  if (isRscRequest(input.request)) {
+    return {
+      meta: rscStream.meta,
+      response: renderRscResponse(rscStream.stream),
+    };
+  }
+
   const response = await renderHtmlResponse(
     input.request,
     rscStream.stream,
@@ -227,25 +244,6 @@ async function renderAppRoute<TContext>(
   return { meta: rscStream.meta, response };
 }
 
-async function renderAppRscRoute<TContext>(
-  input: RenderInput<TContext, RouteModule<TContext>>,
-  options: AppRendererOptions<TContext>,
-  init?: ResponseInit
-): Promise<Response> {
-  const rscStream = await renderRouteToRscStream(
-    {
-      site: options.site,
-      route: renderableRoute(input.route, options.layouts),
-      pathname: input.pathname,
-      request: input.request,
-      context: input.context,
-      params: input.params,
-    },
-    options.renderRsc
-  );
-  return renderRscResponse(rscStream.stream, init);
-}
-
 function createPageRenderer<TContext>(
   options: AppRendererOptions<TContext>
 ): FileRouteRenderer<TContext, RouteModule<TContext>> {
@@ -255,25 +253,12 @@ function createPageRenderer<TContext>(
       return route.file.endsWith(".tsx");
     },
     generatedRoutes(route) {
-      const generated = [
-        {
-          kind: "rsc",
-          method: "GET" as const,
-          owner: route.id,
-          path: rscPathFor(route.path),
-          render: (input: RenderInput<TContext, RouteModule<TContext>>) =>
-            renderAppRscRoute(input, options),
-        },
-      ];
-
       if (hasDynamicRouteSegments(route.path)) {
-        return generated;
+        return [];
       }
 
       return [
-        ...generated,
         {
-          kind: "markdown",
           method: "GET" as const,
           owner: route.id,
           path: toMarkdownPath(route.path),
@@ -316,15 +301,6 @@ function createMarkdownRenderer<TContext>(
     generatedRoutes(route) {
       return [
         {
-          kind: "rsc",
-          method: "GET",
-          owner: route.id,
-          path: rscPathFor(route.path),
-          render: (input: RenderInput<TContext, RouteModule<TContext>>) =>
-            renderAppRscRoute(input, options),
-        },
-        {
-          kind: "markdown",
           method: "GET",
           owner: route.id,
           path: toMarkdownPath(route.path),
@@ -423,7 +399,6 @@ function createAppRouteManifest<TContext>(
     },
     {
       files: routeSourceFiles(globs.handlers),
-      routes: honoRoutes(),
     },
   ];
 
@@ -552,8 +527,6 @@ export function createApp<TContext = unknown>({
   if (notFound) {
     app.get("*", async (c) => {
       const requestPathname = new URL(c.req.url).pathname;
-      const rscPagePath = pagePathFromRscPath(requestPathname);
-      const pathname = rscPagePath ?? requestPathname;
       const context = createRequestContext
         ? await createRequestContext(c.req.raw)
         : (undefined as TContext);
@@ -562,11 +535,18 @@ export function createApp<TContext = unknown>({
         layouts: resolveLayoutChain("/", globs.layouts),
       };
       const rscStream = await renderRouteToRscStream(
-        { site, route, pathname, request: c.req.raw, noindex: true, context },
+        {
+          site,
+          route,
+          pathname: requestPathname,
+          request: c.req.raw,
+          noindex: true,
+          context,
+        },
         renderRsc
       );
 
-      if (rscPagePath) {
+      if (isRscRequest(c.req.raw)) {
         return renderRscResponse(rscStream.stream, { status: 404 });
       }
 

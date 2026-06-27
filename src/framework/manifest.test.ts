@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   generatedRoutePathsForRoute,
   resolveLayoutChain,
+  routeFileToLayoutDirectory,
   routeFileToManifestPath,
   routePathsOverlap,
   routePathToShape,
@@ -75,7 +76,6 @@ describe("routeFileToManifestPath", () => {
       )
     ).toEqual({
       path: "/app/parties/:partyId",
-      routeDirectory: "app/parties/[partyId]",
     });
   });
 
@@ -87,14 +87,12 @@ describe("routeFileToManifestPath", () => {
       )
     ).toEqual({
       path: "/app/parties/:partyId/events/:eventId/reception",
-      routeDirectory: "app/parties/[partyId]/events/[eventId]",
     });
   });
 
   it("removes trailing index segments", () => {
     expect(routeFileToManifestPath("../routes/app/index.tsx", ".tsx")).toEqual({
       path: "/app",
-      routeDirectory: "app",
     });
   });
 
@@ -103,7 +101,6 @@ describe("routeFileToManifestPath", () => {
       routeFileToManifestPath("../routes/blog/[...slug]/index.tsx", ".tsx")
     ).toEqual({
       path: "/blog/:slug{.+}",
-      routeDirectory: "blog/[...slug]",
     });
   });
 
@@ -143,18 +140,31 @@ describe("routePathsOverlap", () => {
   });
 });
 
-describe("generatedRoutePathsForRoute", () => {
-  it("generates RSC and markdown routes for static routes", () => {
-    expect(generatedRoutePathsForRoute("/about")).toEqual([
-      "/__rsc/about",
-      "/about.md",
-    ]);
+describe("routeFileToLayoutDirectory", () => {
+  it("returns the route directory for index routes", () => {
+    expect(
+      routeFileToLayoutDirectory("../routes/app/parties/[partyId]/index.tsx")
+    ).toBe("app/parties/[partyId]");
   });
 
-  it("does not generate markdown routes for dynamic routes", () => {
-    expect(generatedRoutePathsForRoute("/users/:id")).toEqual([
-      "/__rsc/users/:id",
-    ]);
+  it("returns the parent directory for leaf routes", () => {
+    expect(routeFileToLayoutDirectory("../routes/about/career.tsx")).toBe(
+      "about"
+    );
+  });
+
+  it("returns root for top-level files", () => {
+    expect(routeFileToLayoutDirectory("../routes/about.tsx")).toBe("");
+  });
+});
+
+describe("generatedRoutePathsForRoute", () => {
+  it("generates raw markdown routes for static routes", () => {
+    expect(generatedRoutePathsForRoute("/about")).toEqual(["/about.md"]);
+  });
+
+  it("does not generate extra routes for dynamic routes", () => {
+    expect(generatedRoutePathsForRoute("/users/:id")).toEqual([]);
   });
 });
 

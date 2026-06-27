@@ -8,15 +8,25 @@ import {
 import type { LayoutEntry, LayoutLoader } from "./types";
 
 const RE_ROUTE_PREFIX = /^(?:\.\.?\/)*routes\//;
-const RSC_ROUTE_PREFIX = "/__rsc";
+const RE_ROUTE_EXTENSION = /\.[^.]+$/;
+const RE_SOURCE_PREFIX = /^\.\/+/;
+const RE_TRAILING_INDEX = /(^|\/)index$/;
 
 interface ManifestPath {
   path: string;
-  routeDirectory: string;
 }
 
 function stripRoutePrefix(file: string): string {
   return file.replace(RE_ROUTE_PREFIX, "");
+}
+
+function dirname(path: string): string {
+  const index = path.lastIndexOf("/");
+  return index === -1 ? "" : path.slice(0, index);
+}
+
+function trimSlashes(path: string): string {
+  return path.replace(/^\/+|\/+$/g, "");
 }
 
 export function routeFileToManifestPath(
@@ -24,6 +34,19 @@ export function routeFileToManifestPath(
   _extension: ".md" | ".ts" | ".tsx"
 ): ManifestPath {
   return routeRootFileToManifestPath(stripRoutePrefix(file));
+}
+
+export function routeFileToLayoutDirectory(file: string): string {
+  const stem = stripRoutePrefix(file)
+    .replace(RE_SOURCE_PREFIX, "")
+    .replace(RE_ROUTE_EXTENSION, "");
+  const withoutIndex = trimSlashes(stem.replace(RE_TRAILING_INDEX, ""));
+
+  if (!withoutIndex) {
+    return "";
+  }
+
+  return stem === withoutIndex ? dirname(withoutIndex) : withoutIndex;
 }
 
 export function hasDynamicRouteSegments(path: string): boolean {
@@ -48,16 +71,11 @@ export function toMarkdownPath(path: string): string {
   return path === "/" ? "/index.md" : `${path}.md`;
 }
 
-function rscPathFor(path: string): string {
-  return path === "/" ? RSC_ROUTE_PREFIX : `${RSC_ROUTE_PREFIX}${path}`;
-}
-
 export function generatedRoutePathsForRoute(path: string): string[] {
-  const paths = [rscPathFor(path)];
-  if (!coreHasDynamicRouteSegments(path)) {
-    paths.push(toMarkdownPath(path));
+  if (coreHasDynamicRouteSegments(path)) {
+    return [];
   }
-  return paths;
+  return [toMarkdownPath(path)];
 }
 
 export function resolveLayoutChain<TContext = unknown>(

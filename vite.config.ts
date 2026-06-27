@@ -22,7 +22,10 @@ export default defineConfig(({ mode }) => ({
     environment: "node",
     server: {
       deps: {
-        inline: ["@yoshikouki/hono-file-router"],
+        inline: [
+          "@yoshikouki/hono-file-router",
+          "@yoshikouki/hono-rsc-renderer",
+        ],
       },
     },
     coverage: {
@@ -36,7 +39,7 @@ export default defineConfig(({ mode }) => ({
     rsc: {
       build: {
         rollupOptions: {
-          input: { index: "./src/framework/entry.rsc.tsx" },
+          input: { index: "./src/index.tsx" },
           output: {
             manualChunks(id) {
               // Keep the React/RSC runtime in a shared chunk so page route
@@ -53,17 +56,10 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-    ssr: {
-      build: {
-        rollupOptions: {
-          input: { index: "./src/framework/entry.ssr.tsx" },
-        },
-      },
-    },
     client: {
       build: {
         rollupOptions: {
-          input: { index: "./src/framework/entry.browser.tsx" },
+          input: { index: "@yoshikouki/hono-rsc-renderer/entry.browser" },
         },
       },
     },

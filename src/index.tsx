@@ -1,5 +1,5 @@
+import { createApp } from "@/framework/server";
 import { notFound, routeGlobs, site } from "@/site";
-import { createApp } from "./server";
 
 const app = createApp({ site, globs: routeGlobs, notFound });
 

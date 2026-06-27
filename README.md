@@ -6,8 +6,10 @@ A minimal template for running **React Server Components** on **Cloudflare Worke
 
 - **React 19** — Server Components + Streaming SSR
 - **Hono** — Handles all routing (pages + API)
-- **`@vitejs/plugin-rsc`** — RSC protocol implementation (Vite 6 Environment API)
-- **Dedicated `/__rsc` routes** — Separates the hydration payload from the initial HTML response
+- **`@vitejs/plugin-rsc`** — RSC protocol implementation
+- **`@yoshikouki/hono-file-router`** — File route manifesting and Hono mounting
+- **`@yoshikouki/hono-rsc-renderer`** — Browser and SSR RSC runtime entries
+- **Same-path Flight** — HTML and RSC payloads share URLs and vary by `RSC` / `Accept`
 - **Cloudflare Workers** — edge runtime
 
 ## Get Started
@@ -26,9 +28,9 @@ bun run deploy   # deploy to Cloudflare Workers
 
 | Environment | Role | Entry |
 |---|---|---|
-| `rsc` | RSC rendering + all routing | `src/framework/entry.rsc.tsx` |
-| `ssr` | Convert RSC stream → initial HTML | `src/framework/entry.ssr.tsx` |
-| `client` | Fetch `/__rsc/...` and hydrate | `src/framework/entry.browser.tsx` |
+| `rsc` | RSC rendering + all routing | `src/index.tsx` |
+| `ssr` | Convert RSC stream → initial HTML | `@yoshikouki/hono-rsc-renderer/entry.ssr` |
+| `client` | Fetch same-path Flight and hydrate | `@yoshikouki/hono-rsc-renderer/entry.browser` |
 
 ### Request Flow
 
@@ -36,50 +38,49 @@ bun run deploy   # deploy to Cloudflare Workers
 
 ```
 Browser → GET /
-  → entry.rsc.tsx: createApp() → Hono handles route
+  → src/index.tsx: createApp() → Hono handles route
   → render.tsx: renderRouteToRscStream() → RSC stream
-  → entry.ssr.tsx: createFromReadableStream() + renderToReadableStream()
+  → @yoshikouki/hono-rsc-renderer/entry.ssr
   → Response: Content-Type: text/html
 ```
 
 **Hydration payload**
 
 ```
-Browser → GET /__rsc
-  → server.ts: dedicated RSC route → returns RSC stream directly
+Browser → GET /
+  headers: RSC: 1, Accept: text/x-component
+  → server.ts: same route → returns RSC stream directly
   → Response: Content-Type: text/x-component
 ```
 
 **Hydration**
 
 ```
-Browser: createFromFetch(fetch("/__rsc/...")) → hydrateRoot()
+Browser: @yoshikouki/hono-rsc-renderer/entry.browser → hydrateRoot()
 ```
 
 ### RSC Payload Routing
 
-HTML and RSC payloads use separate URLs:
+HTML and RSC payloads use the same URL:
 
 - `/about` → HTML response for the initial render
-- `/__rsc/about` → RSC payload used for hydration and RSC refreshes
+- `/about` with `RSC: 1` and `Accept: text/x-component` → RSC payload used for hydration and RSC refreshes
 
-This keeps the initial HTML response focused on first paint and avoids relying on `Vary: Accept` for shared CDN cache separation. RSC responses are returned with `Cache-Control: private, no-store`; route-level `cacheControl` applies to HTML responses only.
+Responses set `Vary: RSC, Accept` because the same path can return either HTML or Flight. RSC responses are returned with `Cache-Control: private, no-store`; route-level `cacheControl` applies to HTML responses only.
 
 ## File Structure
 
 ```
 src/
 ├── site.tsx              # App-layer config (SiteConfig, routeGlobs, notFound)
+├── index.tsx             # RSC env entry
 ├── framework/            # Framework layer — no site-specific knowledge
 │   ├── types.ts          # All shared types
-│   ├── manifest.ts       # glob → Route[] (pure, testable)
+│   ├── manifest.ts       # Template route helpers
 │   ├── content/          # Frontmatter parser, markdown adapter, response helpers
 │   ├── document.tsx      # HTML document shell
 │   ├── render.tsx        # Layout composition + RSC stream
-│   ├── server.ts         # Hono app factory + /__rsc route separation
-│   ├── entry.rsc.tsx     # RSC env entry
-│   ├── entry.ssr.tsx     # SSR env entry
-│   └── entry.browser.tsx # Client env entry
+│   └── server.ts         # Hono app factory + same-path Flight handling
 ├── lib/
 │   └── markdown/         # MD → React rendering (remark/rehype + Tailwind components)
 ├── routes/               # File-based routing
@@ -204,13 +205,14 @@ Filename routes support single dynamic segments using Next.js-style brackets:
 ```txt
 src/routes/books/[id]/index.tsx -> /books/:id
 src/routes/books/[id]/reviews/[reviewId].tsx -> /books/:id/reviews/:reviewId
+src/routes/docs/[...slug].tsx -> /docs/:slug{.+}
 ```
 
 Dynamic params are available from both `PageProps.params` and `RouteContext.params`.
 Markdown content routes are static-only; dynamic Markdown files such as `src/routes/blog/[slug].md` fail during manifest construction.
 Dynamic page routes should use `.tsx` pages or programmatic routes.
 Generated `.md` endpoints are available only for static page-like routes, so a dynamic route such as `/books/:id` does not generate `/books/foo.md`.
-Catch-all and optional segments such as `[...slug]` and `[[slug]]` are intentionally unsupported and fail during manifest construction.
+Optional segments such as `[[slug]]` are intentionally unsupported and fail during manifest construction.
 Dynamic routes without `enumerate()` are excluded from `routeManifest()` because there is no concrete URL to publish in sitemap-like endpoints.
 
 ### createRequestContext (per-request data)
@@ -218,7 +220,7 @@ Dynamic routes without `enumerate()` are excluded from `routeManifest()` because
 Thread request-derived data (auth, cookies, locale, …) through to every page and layout via `props.context`:
 
 ```tsx
-// src/site.tsx — add createRequestContext to createApp call in entry.rsc.tsx
+// src/site.tsx — add createRequestContext to createApp call in src/index.tsx
 export function createRequestContext(req: Request) {
   return { user: parseUserFromCookie(req.headers.get("Cookie") ?? "") };
 }
@@ -262,5 +264,5 @@ export const site: SiteConfig = {
 ## Limitations
 
 - **Server Actions** (`"use server"`) are not implemented. Use Hono RPC (`.ts` handler routes) instead.
-- Initial hydration performs a follow-up `/__rsc/...` request instead of using an inline RSC payload.
-- Initial HTML and `/__rsc/...` are separate renders. Keep initial client component output deterministic, and move browser-time values such as clocks into effects after hydration.
+- Initial hydration performs a follow-up same-path Flight request instead of using an inline RSC payload.
+- Initial HTML and Flight are separate renders. Keep initial client component output deterministic, and move browser-time values such as clocks into effects after hydration.

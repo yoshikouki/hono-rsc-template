@@ -3,9 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createApp,
   includeRouteManifestEntry,
-  pagePathFromRscPath,
   pathnameFromRoutePath,
-  rscPathFor,
 } from "./server";
 import type {
   LayoutLoader,
@@ -36,6 +34,8 @@ const stubRenderer = {
   renderHtml: stubRenderHtml,
 };
 
+const rscHeaders = { Accept: "text/x-component", RSC: "1" };
+
 const layoutLoader: LayoutLoader = async () => ({
   default: ({ children }) => children as React.ReactElement,
 });
@@ -56,31 +56,6 @@ function makeGlobs(overrides: Partial<RouteGlobs> = {}): RouteGlobs {
     ...overrides,
   };
 }
-
-describe("rscPathFor", () => {
-  it("maps root page to /__rsc", () => {
-    expect(rscPathFor("/")).toBe("/__rsc");
-  });
-
-  it("prefixes non-root page paths", () => {
-    expect(rscPathFor("/about")).toBe("/__rsc/about");
-  });
-});
-
-describe("pagePathFromRscPath", () => {
-  it("maps /__rsc and /__rsc/ to root", () => {
-    expect(pagePathFromRscPath("/__rsc")).toBe("/");
-    expect(pagePathFromRscPath("/__rsc/")).toBe("/");
-  });
-
-  it("strips the RSC prefix from nested paths", () => {
-    expect(pagePathFromRscPath("/__rsc/about")).toBe("/about");
-  });
-
-  it("returns null for normal page paths", () => {
-    expect(pagePathFromRscPath("/about")).toBeNull();
-  });
-});
 
 describe("pathnameFromRoutePath", () => {
   it("returns the canonical static route path", () => {
@@ -116,13 +91,13 @@ describe("includeRouteManifestEntry", () => {
 });
 
 describe("createApp", () => {
-  it("returns text/x-component from the /__rsc route", async () => {
+  it("returns text/x-component from the same page route with RSC headers", async () => {
     const app = createApp({
       site: baseSite,
       globs: makeGlobs(),
       renderer: stubRenderer,
     });
-    const res = await app.request("/__rsc");
+    const res = await app.request("/", { headers: rscHeaders });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("text/x-component");
   });
@@ -138,7 +113,7 @@ describe("createApp", () => {
     expect(res.headers.get("Content-Type")).toContain("text/html");
   });
 
-  it("keeps the page route HTML even when Accept asks for RSC", async () => {
+  it("returns Flight from the page route when Accept asks for RSC", async () => {
     const app = createApp({
       site: baseSite,
       globs: makeGlobs(),
@@ -147,17 +122,18 @@ describe("createApp", () => {
     const res = await app.request("/", {
       headers: { Accept: "text/x-component" },
     });
-    expect(res.headers.get("Content-Type")).toContain("text/html");
+    expect(res.headers.get("Content-Type")).toContain("text/x-component");
   });
 
-  it("does not vary page responses by Accept", async () => {
+  it("varies page responses by RSC and Accept", async () => {
     const app = createApp({
       site: baseSite,
       globs: makeGlobs(),
       renderer: stubRenderer,
     });
     const res = await app.request("/");
-    expect(res.headers.get("Vary")).toBeNull();
+    expect(res.headers.get("Vary")).toContain("RSC");
+    expect(res.headers.get("Vary")).toContain("Accept");
   });
 
   it("sets Speculation-Rules on HTML response when speculationRulesPath is set", async () => {
@@ -188,7 +164,7 @@ describe("createApp", () => {
       globs: makeGlobs(),
       renderer: stubRenderer,
     });
-    const res = await app.request("/__rsc");
+    const res = await app.request("/", { headers: rscHeaders });
     expect(res.headers.get("Speculation-Rules")).toBeNull();
   });
 
@@ -214,7 +190,7 @@ describe("createApp", () => {
       },
     });
     const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
-    const res = await app.request("/__rsc");
+    const res = await app.request("/", { headers: rscHeaders });
     expect(res.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
@@ -293,7 +269,9 @@ describe("createApp", () => {
     const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
 
     const htmlRes = await app.request("/app/parties/p1/events/e2");
-    const rscRes = await app.request("/__rsc/app/parties/p1/events/e2");
+    const rscRes = await app.request("/app/parties/p1/events/e2", {
+      headers: rscHeaders,
+    });
 
     expect(htmlRes.status).toBe(200);
     expect(rscRes.status).toBe(200);
@@ -324,7 +302,9 @@ describe("createApp", () => {
     const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
 
     const htmlRes = await app.request("/docs/guides/getting-started");
-    const rscRes = await app.request("/__rsc/docs/guides/getting-started");
+    const rscRes = await app.request("/docs/guides/getting-started", {
+      headers: rscHeaders,
+    });
 
     expect(htmlRes.status).toBe(200);
     expect(rscRes.status).toBe(200);
@@ -355,8 +335,12 @@ describe("createApp", () => {
     const settingsHtml = await app.request("/users/settings");
     const settingsMarkdown = await app.request("/users/settings.md");
     const dynamicHtml = await app.request("/users/alice");
-    const settingsRsc = await app.request("/__rsc/users/settings");
-    const dynamicRsc = await app.request("/__rsc/users/alice");
+    const settingsRsc = await app.request("/users/settings", {
+      headers: rscHeaders,
+    });
+    const dynamicRsc = await app.request("/users/alice", {
+      headers: rscHeaders,
+    });
 
     expect(settingsHtml.status).toBe(200);
     expect(settingsMarkdown.status).toBe(200);
@@ -391,7 +375,7 @@ describe("createApp", () => {
     const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
 
     const htmlRes = await app.request("/about/");
-    const rscRes = await app.request("/__rsc/about/");
+    const rscRes = await app.request("/about/", { headers: rscHeaders });
     const markdownRes = await app.request("/about.md");
 
     expect(htmlRes.status).toBe(200);
@@ -512,7 +496,7 @@ describe("createApp", () => {
     expect(res.headers.get("Content-Type")).toContain("text/html");
   });
 
-  it("returns RSC 404 for unknown /__rsc route", async () => {
+  it("returns RSC 404 for unknown same-path Flight request", async () => {
     const notFound = makePageLoader("Not Found");
     const app = createApp({
       site: baseSite,
@@ -520,7 +504,7 @@ describe("createApp", () => {
       notFound,
       renderer: stubRenderer,
     });
-    const res = await app.request("/__rsc/does-not-exist");
+    const res = await app.request("/does-not-exist", { headers: rscHeaders });
     expect(res.status).toBe(404);
     expect(res.headers.get("Content-Type")).toContain("text/x-component");
   });
