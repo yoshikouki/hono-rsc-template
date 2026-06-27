@@ -47,6 +47,13 @@ export const markdownFiles = import.meta.glob<string>("./**/*.md", {
   import: "default",
 }) as MarkdownFiles;
 
+function loadSiteCss(): ReactNode {
+  if (import.meta.env.MODE === "test") {
+    return null;
+  }
+  return import.meta.viteRsc.loadCss();
+}
+
 export const site: SiteConfig = {
   baseUrl: "https://example.com",
   name: "My App",
@@ -64,7 +71,7 @@ export const site: SiteConfig = {
     <>
       {/* globals.css is imported by this module; loadCss() collects the
           importer's CSS, so it must be called from this app module. */}
-      {import.meta.viteRsc?.loadCss?.()}
+      {loadSiteCss()}
     </>
   ),
 };
