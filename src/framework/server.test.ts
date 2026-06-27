@@ -308,6 +308,32 @@ describe("createApp", () => {
     ]);
   });
 
+  it("passes catch-all params to HTML and RSC page renders", async () => {
+    const defaultParams: Record<string, string>[] = [];
+    const globs = makeGlobs({
+      pages: {
+        "./routes/docs/[...slug].tsx": async (): Promise<RouteModule> => ({
+          default: ({ params }) => {
+            defaultParams.push(params);
+            return createElement("div", null, params.slug);
+          },
+          resolveMeta: ({ params }) => ({ title: params.slug }),
+        }),
+      },
+    });
+    const app = createApp({ site: baseSite, globs, renderer: stubRenderer });
+
+    const htmlRes = await app.request("/docs/guides/getting-started");
+    const rscRes = await app.request("/__rsc/docs/guides/getting-started");
+
+    expect(htmlRes.status).toBe(200);
+    expect(rscRes.status).toBe(200);
+    expect(defaultParams).toEqual([
+      { slug: "guides/getting-started" },
+      { slug: "guides/getting-started" },
+    ]);
+  });
+
   it("serves static markdown siblings without shadowing by dynamic pages", async () => {
     const renderedDynamicIds: string[] = [];
     const globs = makeGlobs({
@@ -754,6 +780,28 @@ describe("createApp", () => {
       });
       const res = await app.request("/books/123");
       expect(res.status).toBe(200);
+    });
+
+    it("serves dynamic programmatic route", async () => {
+      const capturedParams: Record<string, string>[] = [];
+      const load = async (): Promise<RouteModule> => ({
+        default: ({ params }) => {
+          capturedParams.push(params);
+          return createElement("div", null, params.id);
+        },
+        resolveMeta: ({ params }) => ({ title: params.id }),
+      });
+      const app = createApp({
+        site: baseSite,
+        globs: makeGlobs({ pages: {} }),
+        routes: [{ path: "/books/:id", load }],
+        renderer: stubRenderer,
+      });
+
+      const res = await app.request("/books/123");
+
+      expect(res.status).toBe(200);
+      expect(capturedParams).toEqual([{ id: "123" }]);
     });
 
     it("includes programmatic routes in routeManifest", async () => {

@@ -30,6 +30,7 @@ import type {
   RouteGlobs,
   RouteLoader,
   RouteManifestEntry,
+  RouteModule,
   SiteConfig,
 } from "./types";
 
@@ -37,6 +38,7 @@ const RSC_CONTENT_TYPE = "text/x-component;charset=utf-8";
 const HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 const RSC_CACHE_CONTROL = "private, no-store";
 const RSC_ROUTE_PREFIX = "/__rsc";
+const RE_HONO_CATCH_ALL_PARAM = /^([A-Za-z_$][\w$]*)\{\.\+\}$/;
 const RE_LAYOUT_TSX_FILE = /(?:^|\/)layout\.tsx$/;
 const RE_MARKDOWN_EXT = /\.md$/;
 const RE_ROUTE_PREFIX = /^(?:\.\.?\/)*routes\//;
@@ -160,7 +162,25 @@ function routeSourceFiles<T>(
 
 function programmaticRouteFile(path: string): string {
   const trimmed = path.replace(/^\/+|\/+$/g, "");
-  return `${trimmed || "index"}.tsx`;
+  if (!trimmed) {
+    return "index.tsx";
+  }
+
+  const fileSegments = trimmed.split("/").map((segment) => {
+    if (!segment.startsWith(":")) {
+      return segment;
+    }
+
+    const param = segment.slice(1);
+    const catchAll = param.match(RE_HONO_CATCH_ALL_PARAM);
+    if (catchAll) {
+      return `[...${catchAll[1]}]`;
+    }
+
+    return `[${param}]`;
+  });
+
+  return `${fileSegments.join("/")}.tsx`;
 }
 
 function renderableRoute<TContext>(
