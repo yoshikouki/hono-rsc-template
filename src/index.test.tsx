@@ -41,6 +41,12 @@ describe("createApp", () => {
     expect(res.headers.get("Content-Type")).toContain("text/html");
   });
 
+  it("serves the posts route entry point", async () => {
+    const res = await testApp().request("/posts");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/html");
+  });
+
   it("serves nested dynamic Hono route modules", async () => {
     const app = testApp();
 

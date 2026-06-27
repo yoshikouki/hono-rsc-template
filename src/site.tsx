@@ -87,6 +87,11 @@ export const siteManifest: SiteManifestEntry[] = [
     title: "About",
     description: "About this template",
   },
+  {
+    path: "/posts",
+    title: "Posts",
+    description: "Nested dynamic post routes",
+  },
   ...markdownManifestEntries(markdownFiles, {
     filterDrafts: import.meta.env.PROD,
   }),

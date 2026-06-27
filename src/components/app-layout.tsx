@@ -11,6 +11,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <a className="hover:underline" href="/about">
             About
           </a>
+          <a className="hover:underline" href="/posts">
+            Posts
+          </a>
         </nav>
       </header>
       <main>{children}</main>
