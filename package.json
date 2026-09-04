@@ -32,12 +32,12 @@
     "@cloudflare/workers-types": "^4.20260624.1",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitejs/plugin-rsc": "^0.5.25",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitest/coverage-v8": "^5.0.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "typescript": "^6.0.3",
     "ultracite": "7.8.3",
     "vite": "^8.1.0",
-    "vitest": "^4.1.9",
+    "vitest": "^5.0.0",
     "wrangler": "^4.104.0"
   }
 }
