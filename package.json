@@ -24,7 +24,7 @@
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
-    "tailwindcss": "^4.3.1",
+    "tailwindcss": "^4.3.4",
     "unified": "^11.0.5"
   },
   "devDependencies": {
