@@ -31,7 +31,7 @@
     "@biomejs/biome": "2.6.5",
     "@cloudflare/workers-types": "^4.20260624.1",
     "@vitejs/plugin-react": "^6.0.3",
-    "@vitejs/plugin-rsc": "^0.5.25",
+    "@vitejs/plugin-rsc": "^0.5.39",
     "@vitest/coverage-v8": "^5.0.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "typescript": "^6.0.3",
