@@ -1,4 +1,4 @@
-const RE_FRONTMATTER = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
+const RE_FRONTMATTER = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/u;
 
 const stripWrappedQuotes = (value: string): string => {
   const trimmed = value.trim();

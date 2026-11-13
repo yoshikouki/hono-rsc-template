@@ -5,7 +5,7 @@ import { PostIdForm } from "@/components/post-id-form";
 function PostDetailPage({ id }: { id: string }) {
   return (
     <div>
-      <h1 className="mb-4 font-bold text-3xl">Post Detail</h1>
+      <h1 className="mb-4 text-3xl font-bold">Post Detail</h1>
       <p className="text-gray-600">
         Dynamic post id: <strong>{id}</strong>
       </p>

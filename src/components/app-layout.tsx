@@ -17,7 +17,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </nav>
       </header>
       <main>{children}</main>
-      <footer className="mt-8 border-t pt-4 text-gray-500 text-sm">
+      <footer className="mt-8 border-t pt-4 text-sm text-gray-500">
         <p>Built with Hono + RSC</p>
       </footer>
     </div>

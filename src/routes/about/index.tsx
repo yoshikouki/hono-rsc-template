@@ -5,7 +5,7 @@ import { AppLayout } from "@/components/app-layout";
 function AboutPage() {
   return (
     <div>
-      <h1 className="mb-4 font-bold text-3xl">About</h1>
+      <h1 className="mb-4 text-3xl font-bold">About</h1>
       <p className="text-gray-600">
         This template demonstrates file-based routing with Hono + RSC.
       </p>
