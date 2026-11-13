@@ -24,7 +24,7 @@ export function PostIdForm({ id }: PostIdFormProps) {
         }
       }}
     >
-      <label className="font-semibold text-sm" htmlFor="post-id">
+      <label className="text-sm font-semibold" htmlFor="post-id">
         Post ID
       </label>
       <div className="flex gap-2">

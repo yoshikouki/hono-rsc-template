@@ -4,16 +4,16 @@ type Props<T extends keyof JSX.IntrinsicElements> = ComponentPropsWithoutRef<T>;
 
 export const markdownComponents = {
   h1: (props: Props<"h1">) => (
-    <h1 className="mb-6 font-bold text-4xl" {...props} />
+    <h1 className="mb-6 text-4xl font-bold" {...props} />
   ),
   h2: (props: Props<"h2">) => (
     <h2
-      className="mt-10 mb-4 border-b pb-2 font-semibold text-2xl"
+      className="mt-10 mb-4 border-b pb-2 text-2xl font-semibold"
       {...props}
     />
   ),
   h3: (props: Props<"h3">) => (
-    <h3 className="mt-8 mb-3 font-semibold text-xl" {...props} />
+    <h3 className="mt-8 mb-3 text-xl font-semibold" {...props} />
   ),
   p: (props: Props<"p">) => <p className="mt-4 leading-7" {...props} />,
   a: (props: Props<"a">) => (

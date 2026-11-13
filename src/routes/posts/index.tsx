@@ -5,7 +5,7 @@ import { PostIdForm } from "@/components/post-id-form";
 function PostsPage() {
   return (
     <div>
-      <h1 className="mb-4 font-bold text-3xl">Posts</h1>
+      <h1 className="mb-4 text-3xl font-bold">Posts</h1>
       <p className="mb-6 text-gray-600">
         Try a nested dynamic route at{" "}
         <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm">

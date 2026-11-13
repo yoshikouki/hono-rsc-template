@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { site, siteManifest } from "@/site";
 
-const TRAILING_SLASH_RE = /\/$/;
+const TRAILING_SLASH_RE = /\/$/u;
 
 const app = new Hono();
 

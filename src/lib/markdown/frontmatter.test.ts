@@ -1,8 +1,8 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test as it } from "vitest";
 import { parseFrontmatter } from "./frontmatter";
 
 describe("parseFrontmatter", () => {
-  test("parses title and description", () => {
+  it("parses title and description", () => {
     const raw = `---
 title: Hello World
 description: A test post
@@ -14,7 +14,7 @@ Body content`;
     expect(result.body).toBe("Body content");
   });
 
-  test("parses draft: true as boolean", () => {
+  it("parses draft: true as boolean", () => {
     const raw = `---
 title: Draft Post
 draft: true
@@ -24,7 +24,7 @@ Body`;
     expect(result.draft).toBe(true);
   });
 
-  test("parses draft: false as undefined", () => {
+  it("parses draft: false as undefined", () => {
     const raw = `---
 title: Published Post
 draft: false
@@ -34,7 +34,7 @@ Body`;
     expect(result.draft).toBeUndefined();
   });
 
-  test("parses tags from comma-separated string", () => {
+  it("parses tags from comma-separated string", () => {
     const raw = `---
 title: Tagged Post
 tags: blog, hello, world
@@ -44,7 +44,7 @@ Body`;
     expect(result.tags).toEqual(["blog", "hello", "world"]);
   });
 
-  test("parses date as string", () => {
+  it("parses date as string", () => {
     const raw = `---
 title: Dated Post
 date: 2025-01-01
@@ -54,7 +54,7 @@ Body`;
     expect(result.date).toBe("2025-01-01");
   });
 
-  test("returns empty title and raw body when no frontmatter", () => {
+  it("returns empty title and raw body when no frontmatter", () => {
     const raw = "Just body content without frontmatter";
     const result = parseFrontmatter(raw);
     expect(result.title).toBe("");

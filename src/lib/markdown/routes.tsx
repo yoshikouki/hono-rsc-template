@@ -31,7 +31,7 @@ interface MarkdownRouteOptions {
   filterDrafts?: boolean;
 }
 
-const RE_ROUTE_PREFIX = /^(?:\.\/)?routes\//;
+const RE_ROUTE_PREFIX = /^(?:\.\/)?routes\//u;
 
 export function toMarkdownPath(path: string): string {
   return path === "/" ? "/index.md" : `${path}.md`;
