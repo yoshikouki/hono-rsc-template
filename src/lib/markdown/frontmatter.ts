@@ -1,4 +1,4 @@
-const RE_FRONTMATTER = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/u;
+const RE_FRONTMATTER = /^---\n(?<metadata>[\s\S]*?)\n---\n(?<body>[\s\S]*)$/u;
 
 const stripWrappedQuotes = (value: string): string => {
   const trimmed = value.trim();
@@ -6,7 +6,7 @@ const stripWrappedQuotes = (value: string): string => {
     return trimmed;
   }
 
-  const first = trimmed[0];
+  const [first] = trimmed;
   const last = trimmed.at(-1);
   if ((first === '"' || first === "'") && last === first) {
     return trimmed.slice(1, -1);
@@ -26,12 +26,12 @@ export interface Frontmatter {
 
 export function parseFrontmatter(raw: string): Frontmatter {
   const match = raw.match(RE_FRONTMATTER);
-  if (!match) {
+  if (!match?.groups) {
     return { title: "", body: raw };
   }
 
   const meta: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
+  for (const line of match.groups.metadata.split("\n")) {
     const [key, ...rest] = line.split(":");
     if (key && rest.length) {
       meta[key.trim()] = stripWrappedQuotes(rest.join(":"));
@@ -51,6 +51,6 @@ export function parseFrontmatter(raw: string): Frontmatter {
     date: meta.date,
     draft: meta.draft === "true" ? true : undefined,
     tags,
-    body: match[2],
+    body: match.groups.body,
   };
 }

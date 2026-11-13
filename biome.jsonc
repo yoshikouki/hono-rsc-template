@@ -31,29 +31,5 @@
         "useSortedPackageJson": "off"
       }
     }
-  },
-  "overrides": [
-    // Preserve existing inline event handlers; extracting callbacks changes application code.
-    {
-      "includes": [
-        "src/components/click-counter.tsx",
-        "src/components/post-id-form.tsx"
-      ],
-      "linter": { "rules": { "performance": { "noJsxPropsBind": "off" } } }
-    },
-    // Preserve indexed parser access and positional regex captures without rewriting application code.
-    {
-      "includes": ["src/lib/markdown/frontmatter.ts"],
-      "linter": {
-        "rules": {
-          "style": { "useDestructuring": "off", "useNamedCaptureGroup": "off" }
-        }
-      }
-    },
-    // Preserve the existing route-result access without rewriting application code.
-    {
-      "includes": ["src/lib/markdown/routes.tsx"],
-      "linter": { "rules": { "style": { "useDestructuring": "off" } } }
-    }
-  ]
+  }
 }

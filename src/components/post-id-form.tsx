@@ -1,6 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import {
+  type ChangeEvent,
+  type SubmitEvent,
+  useCallback,
+  useState,
+} from "react";
 
 interface PostIdFormProps {
   id: string;
@@ -13,16 +18,25 @@ function postDetailPath(id: string): string {
 export function PostIdForm({ id }: PostIdFormProps) {
   const [nextId, setNextId] = useState(id);
 
+  const handleSubmit = useCallback(
+    (event: SubmitEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const trimmed = nextId.trim();
+      if (trimmed) {
+        window.location.assign(postDetailPath(trimmed));
+      }
+    },
+    [nextId]
+  );
+
+  const handleChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setNextId(event.currentTarget.value);
+  }, []);
+
   return (
     <form
       className="mt-8 flex flex-col gap-3 rounded border bg-gray-50 p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const trimmed = nextId.trim();
-        if (trimmed) {
-          window.location.assign(postDetailPath(trimmed));
-        }
-      }}
+      onSubmit={handleSubmit}
     >
       <label className="text-sm font-semibold" htmlFor="post-id">
         Post ID
@@ -32,7 +46,7 @@ export function PostIdForm({ id }: PostIdFormProps) {
           className="min-w-0 flex-1 rounded border bg-white px-3 py-2"
           id="post-id"
           name="id"
-          onChange={(event) => setNextId(event.currentTarget.value)}
+          onChange={handleChange}
           type="text"
           value={nextId}
         />
