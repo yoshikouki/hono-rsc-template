@@ -162,7 +162,7 @@ export default createSitemapApp();
 
 ## Code Quality
 
-- Biome via Ultracite (indent: space, quote: double, import sort, Tailwind class sort)
+- Biome via Ultracite (indent: space, quote: double). Only Tailwind class sorting is enabled; import and other sorting are off
 - Husky pre-commit: format + vitest run
 - **Do not commit code that fails lint.**
 
