@@ -48,7 +48,7 @@ function markdownRoutes(
   const routes: MarkdownRoute[] = [];
 
   for (const [file, raw] of Object.entries(files)) {
-    const path = routeFileToManifestPath(sourceKey(file)).path;
+    const { path } = routeFileToManifestPath(sourceKey(file));
     if (hasDynamicRouteSegments(path)) {
       throw new Error(
         `Markdown routes do not support dynamic segments in ${file}. Use a TSX route when params are needed.`

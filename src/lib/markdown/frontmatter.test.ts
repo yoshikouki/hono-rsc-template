@@ -60,4 +60,18 @@ Body`;
     expect(result.title).toBe("");
     expect(result.body).toBe(raw);
   });
+
+  it.each([
+    ['"Hello: 世界"', "Hello: 世界"],
+    ["'Hello: 世界'", "Hello: 世界"],
+    ["\"Hello'", "\"Hello'"],
+    ["a", "a"],
+    ["", ""],
+  ])("parses the title %j without changing the body", (title, expected) => {
+    const body = "# Body 😀\n\n---\nMore content\n";
+    const result = parseFrontmatter(`---\ntitle: ${title}\n---\n${body}`);
+
+    expect(result.title).toBe(expected);
+    expect(result.body).toBe(body);
+  });
 });
