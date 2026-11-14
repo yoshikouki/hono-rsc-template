@@ -5,10 +5,22 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "strict": true,
+    // Workers and browser DOM declarations overlap in this RSC app.
+    "skipLibCheck": true,
     "lib": ["ESNext", "DOM"],
-    "types": ["@cloudflare/workers-types"],
+    "types": [
+      "@cloudflare/workers-types",
+      "vite/client",
+      "@vitejs/plugin-rsc/types"
+    ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@yoshikouki/hono-file-router": [
+        "./node_modules/@yoshikouki/hono-file-router/packages/hono-file-router/src/index.ts"
+      ],
+      "@yoshikouki/hono-rsc-renderer": [
+        "./node_modules/@yoshikouki/hono-rsc-renderer/packages/hono-rsc-renderer/src/index.ts"
+      ]
     }
   },
   "include": ["src"]

@@ -1,0 +1,14 @@
+diff --git a/packages/hono-file-router/src/types.ts b/packages/hono-file-router/src/types.ts
+index cb82633c68f6542c2b73c355aeef3bf39b3189e2..2243ad56d64760822f83ca8c47210c24f576a684 100644
+--- a/packages/hono-file-router/src/types.ts
++++ b/packages/hono-file-router/src/types.ts
+@@ -185,6 +185,6 @@
+-export interface FileRouterOptions<
++export type FileRouterOptions<
+   TContext = unknown,
+   E extends Env = Env,
+-> extends HonoOptions<E> {
++> = HonoOptions<E> & {
+   createContext?: (request: Request) => TContext | Promise<TContext>;
+-}
++};
