@@ -10,6 +10,7 @@
     "preview": "NODE_ENV=production wrangler dev --local --port 8787",
     "deploy": "bun run build && wrangler deploy",
     "check": "ultracite check",
+    "typecheck": "tsc --noEmit",
     "fix": "ultracite fix"
   },
   "dependencies": {
@@ -30,6 +31,9 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
     "@cloudflare/workers-types": "^4.20260624.1",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitejs/plugin-rsc": "^0.5.39",
     "@vitest/coverage-v8": "^5.0.0",
@@ -39,5 +43,9 @@
     "vite": "^8.1.0",
     "vitest": "^5.1.0",
     "wrangler": "^4.104.0"
+  },
+  "patchedDependencies": {
+    "hono-kit@github:yoshikouki/hono-kit#9653c8a": "patches/hono-kit@github%3Ayoshikouki%2Fhono-kit#9653c8a.patch",
+    "rehype-react@8.0.0": "patches/rehype-react@8.0.0.patch"
   }
 }

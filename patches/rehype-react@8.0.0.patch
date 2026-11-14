@@ -1,0 +1,18 @@
+diff --git a/index.d.ts b/index.d.ts
+index dee7c4db8b7fabb3818f5d38d0bb6fa8dc00cdac..88e8e19ddf87678b7f4965ff81b361cc74f4f9e7 100644
+--- a/index.d.ts
++++ b/index.d.ts
+@@ -1,3 +1,4 @@
+ import type {Root} from 'hast'
++import type {JSX} from 'react'
+ import type {Plugin} from 'unified'
+ import type {Options} from './lib/index.js'
+diff --git a/lib/index.d.ts b/lib/index.d.ts
+index 410a89206cfec3ddcc1dc6d199e3c12f89382261..4812310ba6f819d3324fa5ddeac034ef0696193f 100644
+--- a/lib/index.d.ts
++++ b/lib/index.d.ts
+@@ -1,3 +1,4 @@
++import type {JSX} from 'react';
+ /**
+  * Turn HTML into preact, react, solid, svelte, vue, etc.
+  *

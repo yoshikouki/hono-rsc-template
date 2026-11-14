@@ -1,4 +1,5 @@
-import { Hono } from "hono";
+import { type Env, Hono } from "hono";
+import type { BlankSchema } from "hono/types";
 import { AppLayout } from "@/components/app-layout";
 import { PostIdForm } from "@/components/post-id-form";
 
@@ -19,7 +20,8 @@ function PostDetailPage({ id }: { id: string }) {
   );
 }
 
-const app = new Hono();
+// The file router mounts this module at /posts/:id/detail.
+const app = new Hono<Env, BlankSchema, "/posts/:id/detail">();
 
 app.get("/", (c) => {
   const id = c.req.param("id");
