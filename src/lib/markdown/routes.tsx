@@ -63,14 +63,21 @@ function markdownRoutes(
   options: MarkdownRouteOptions = {}
 ): MarkdownRoute[] {
   const routes: MarkdownRoute[] = [];
-  const sources = Object.entries(files).map(
-    ([file, raw]) => [file, sourceKey(file), raw] as const
-  );
+  // Drop excluded drafts before resolving paths so they cannot collide with
+  // published routes.
+  const sources = Object.entries(files)
+    .map(([file, raw]) => ({
+      file,
+      frontmatter: parseFrontmatter(raw),
+      key: sourceKey(file),
+      raw,
+    }))
+    .filter(({ frontmatter }) => !(frontmatter.draft && options.filterDrafts));
   const paths = routePaths(
-    Object.fromEntries(sources.map(([, key, raw]) => [key, raw]))
+    Object.fromEntries(sources.map(({ key, raw }) => [key, raw]))
   );
 
-  for (const [file, key, raw] of sources) {
+  for (const { file, frontmatter, key, raw } of sources) {
     const path = paths.get(key);
     if (path === undefined) {
       throw new Error(`No route path was resolved for ${file}.`);
@@ -79,11 +86,6 @@ function markdownRoutes(
       throw new Error(
         `Markdown routes do not support dynamic segments in ${file}. Use a TSX route when params are needed.`
       );
-    }
-
-    const frontmatter = parseFrontmatter(raw);
-    if (frontmatter.draft && options.filterDrafts) {
-      continue;
     }
 
     routes.push({
