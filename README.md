@@ -42,9 +42,9 @@ GET /about
   -> @yoshikouki/hono-rsc-renderer returns HTML or Flight
 ```
 
-Requests with `RSC: 1` or `Accept: text/x-component` return `text/x-component` with `Cache-Control: private, no-store`. Normal browser requests return `text/html`. Both response shapes set `Vary: RSC, Accept`.
+Requests with `RSC: 1` return `text/x-component` with `Cache-Control: private, no-store`; other requests return `text/html`. `Accept` then only checks that the client accepts the selected type, so a request whose `Accept` rejects it (for example `Accept: text/x-component` without `RSC: 1`) receives `406 Not Acceptable`. Both response shapes set `Vary: RSC, Accept`.
 
-The `@yoshikouki/hono-*` dependencies point at the GitHub `yoshikouki/hono-kit` repository. Because Bun installs Git dependencies from the repository root, `vite.config.ts` aliases those package names to the corresponding package sources under `node_modules/@yoshikouki/*/packages/*/src`.
+The `@yoshikouki/hono-*` dependencies point at the GitHub `yoshikouki/hono-kit` repository. Because Bun installs Git dependencies from the repository root, `vite.config.ts` aliases those package names to the corresponding package sources under `node_modules/@yoshikouki/*/packages/*/src`. The packages' own dependencies are not installed this way, so the app lists them directly (`rsc-html-stream` for the renderer's browser entry).
 
 ## File Structure
 
@@ -142,5 +142,4 @@ export interface Env {
 ## Limitations
 
 - Server Actions (`"use server"`) are not implemented. Use Hono handlers instead.
-- Initial hydration performs a follow-up same-path Flight request instead of using an inline RSC payload.
-- Initial HTML and Flight are separate renders. Keep initial client component output deterministic, and move browser-time values such as clocks into effects after hydration.
+- Initial HTML embeds the server Flight payload, and the browser hydrates from it without a second request. Client components still render once during SSR and again during hydration, so keep their initial output deterministic and move browser-time values such as clocks into effects after hydration.
