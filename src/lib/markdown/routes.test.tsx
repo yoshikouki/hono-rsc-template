@@ -48,6 +48,18 @@ describe("Markdown route helpers", () => {
     expect(raw.headers.get("Content-Type")).toContain("text/markdown");
   });
 
+  it("ignores excluded drafts that share a published path", () => {
+    expect(
+      markdownManifestEntries(
+        {
+          "hello.md": "---\ntitle: Hello\n---\nBody",
+          "hello/index.md": "---\ntitle: Draft\ndraft: true\n---\nBody",
+        },
+        { filterDrafts: true }
+      )
+    ).toEqual([{ path: "/hello", title: "Hello" }]);
+  });
+
   it("rejects dynamic Markdown routes", () => {
     expect(() =>
       markdownManifestEntries({

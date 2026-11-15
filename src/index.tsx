@@ -1,4 +1,7 @@
-import { createFileRouter } from "@yoshikouki/hono-file-router";
+import {
+  createFileRouter,
+  type HonoRouteSource,
+} from "@yoshikouki/hono-file-router";
 import {
   type RenderHtml,
   type RenderRsc,
@@ -21,16 +24,13 @@ interface AppEnv {
   Bindings: Env;
 }
 
-const routeModules = import.meta.glob("./**/*.{ts,tsx}", {
-  base: "./routes",
-  eager: true,
-});
-
-const textProp = (value: unknown): string | undefined =>
-  typeof value === "string" ? value : undefined;
-
-const booleanProp = (value: unknown): boolean | undefined =>
-  typeof value === "boolean" ? value : undefined;
+const routeModules = import.meta.glob<HonoRouteSource<AppEnv>>(
+  "./**/*.{ts,tsx}",
+  {
+    base: "./routes",
+    eager: true,
+  }
+);
 
 export function createApp(options: AppOptions = {}): Hono<AppEnv> {
   const app = new Hono<AppEnv>({ strict: false });
@@ -40,13 +40,13 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
     rscRenderer<AppEnv>(
       (props, c) => (
         <Document
-          description={textProp(props.description)}
-          jsonLd={Array.isArray(props.jsonLd) ? props.jsonLd : undefined}
-          noindex={booleanProp(props.noindex)}
-          ogImage={textProp(props.ogImage)}
+          description={props.description}
+          jsonLd={props.jsonLd}
+          noindex={props.noindex}
+          ogImage={props.ogImage}
           pathname={new URL(c.req.url).pathname}
           site={site}
-          title={textProp(props.title) ?? site.name}
+          title={props.title ?? site.name}
         >
           {props.children}
         </Document>
