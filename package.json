@@ -25,6 +25,7 @@
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
+    "rsc-html-stream": "^0.0.8",
     "tailwindcss": "^4.3.4",
     "unified": "^11.0.5"
   },
@@ -45,7 +46,6 @@
     "wrangler": "^4.104.0"
   },
   "patchedDependencies": {
-    "hono-kit@github:yoshikouki/hono-kit#9653c8a": "patches/hono-kit@github%3Ayoshikouki%2Fhono-kit#9653c8a.patch",
     "rehype-react@8.0.0": "patches/rehype-react@8.0.0.patch"
   }
 }

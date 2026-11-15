@@ -16,6 +16,7 @@
         "remark-gfm": "^4.0.1",
         "remark-parse": "^11.0.0",
         "remark-rehype": "^11.1.2",
+        "rsc-html-stream": "^0.0.8",
         "tailwindcss": "^4.3.4",
         "unified": "^11.0.5",
       },
@@ -39,7 +40,6 @@
   },
   "patchedDependencies": {
     "rehype-react@8.0.0": "patches/rehype-react@8.0.0.patch",
-    "hono-kit@github:yoshikouki/hono-kit#9653c8a": "patches/hono-kit@github%3Ayoshikouki%2Fhono-kit#9653c8a.patch",
   },
   "packages": {
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.27.1", "", {}, "sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA=="],
@@ -342,9 +342,9 @@
 
     "@vitest/spy": ["@vitest/spy@5.1.0", "", {}, "sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A=="],
 
-    "@yoshikouki/hono-file-router": ["hono-kit@github:yoshikouki/hono-kit#9653c8a", {}, "yoshikouki-hono-kit-9653c8a", "sha512-4LrofhB4e1SyPxwhM8WCNRtdOVociKh9KNB0WKx9yV5CuySgCoIFnoS/Qcb9ZqfHHBPprKJ0IonQRxdjcaA+Hw=="],
+    "@yoshikouki/hono-file-router": ["hono-kit@github:yoshikouki/hono-kit#78f113d", {}, "yoshikouki-hono-kit-78f113d", "sha512-0DL3bDYcPxOx9ZItazhUjwUOpljWyh8L85dtt0hji70jvCH3nNU5u59OR14H3xeFSas71n4QvMEVpik/rfVeHw=="],
 
-    "@yoshikouki/hono-rsc-renderer": ["hono-kit@github:yoshikouki/hono-kit#9653c8a", {}, "yoshikouki-hono-kit-9653c8a", "sha512-4LrofhB4e1SyPxwhM8WCNRtdOVociKh9KNB0WKx9yV5CuySgCoIFnoS/Qcb9ZqfHHBPprKJ0IonQRxdjcaA+Hw=="],
+    "@yoshikouki/hono-rsc-renderer": ["hono-kit@github:yoshikouki/hono-kit#78f113d", {}, "yoshikouki-hono-kit-78f113d", "sha512-0DL3bDYcPxOx9ZItazhUjwUOpljWyh8L85dtt0hji70jvCH3nNU5u59OR14H3xeFSas71n4QvMEVpik/rfVeHw=="],
 
     "acorn": ["acorn@8.19.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw=="],
 
@@ -687,6 +687,8 @@
     "reusify": ["reusify@1.1.0", "", {}, "sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw=="],
 
     "rolldown": ["rolldown@1.1.2", "", { "dependencies": { "@oxc-project/types": "=0.137.0", "@rolldown/pluginutils": "^1.0.0" }, "optionalDependencies": { "@rolldown/binding-android-arm64": "1.1.2", "@rolldown/binding-darwin-arm64": "1.1.2", "@rolldown/binding-darwin-x64": "1.1.2", "@rolldown/binding-freebsd-x64": "1.1.2", "@rolldown/binding-linux-arm-gnueabihf": "1.1.2", "@rolldown/binding-linux-arm64-gnu": "1.1.2", "@rolldown/binding-linux-arm64-musl": "1.1.2", "@rolldown/binding-linux-ppc64-gnu": "1.1.2", "@rolldown/binding-linux-s390x-gnu": "1.1.2", "@rolldown/binding-linux-x64-gnu": "1.1.2", "@rolldown/binding-linux-x64-musl": "1.1.2", "@rolldown/binding-openharmony-arm64": "1.1.2", "@rolldown/binding-wasm32-wasi": "1.1.2", "@rolldown/binding-win32-arm64-msvc": "1.1.2", "@rolldown/binding-win32-x64-msvc": "1.1.2" }, "bin": { "rolldown": "./bin/cli.mjs" } }, "sha512-x0CrQQqCXWGeI8dTvFfN/Dnv3yMKT9hv5jFjlOreKAx9wqLq9wz7VvLLHyaAXC90/CpggTu9SisSbsJJTPSjNQ=="],
+
+    "rsc-html-stream": ["rsc-html-stream@0.0.8", "", {}, "sha512-5wSLqZmmxqVYV/70Ueq2XMw0NRPeTeUlUCxA+CEdDqE/IGDXG8EOUOjENzC3WYwWkeYSAI8ZrWbpIhPRK4UuRw=="],
 
     "run-parallel": ["run-parallel@1.2.0", "", { "dependencies": { "queue-microtask": "^1.2.2" } }, "sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA=="],
 

@@ -1,7 +1,4 @@
-import {
-  hasDynamicRouteSegments,
-  routeFileToManifestPath,
-} from "@yoshikouki/hono-file-router";
+import { createRouteManifest } from "@yoshikouki/hono-file-router";
 import { Hono } from "hono";
 import type { ReactElement } from "react";
 import { parseFrontmatter } from "./frontmatter";
@@ -41,14 +38,43 @@ function sourceKey(file: string): string {
   return file.replace(RE_ROUTE_PREFIX, "");
 }
 
+function hasDynamicRouteSegments(path: string): boolean {
+  return path.split("/").some((segment) => segment.startsWith(":"));
+}
+
+// Resolve paths with the same file convention as the page router. The
+// manifest is only read for paths and is never mounted.
+function routePaths(files: MarkdownFiles): Map<string, string> {
+  const { routes } = createRouteManifest({
+    sources: {
+      files,
+      renderer: {
+        accepts: () => true,
+        name: "markdown",
+        render: ({ c }) => c.notFound(),
+      },
+    },
+  });
+  return new Map(routes.map(({ file, path }) => [file, path]));
+}
+
 function markdownRoutes(
   files: MarkdownFiles,
   options: MarkdownRouteOptions = {}
 ): MarkdownRoute[] {
   const routes: MarkdownRoute[] = [];
+  const sources = Object.entries(files).map(
+    ([file, raw]) => [file, sourceKey(file), raw] as const
+  );
+  const paths = routePaths(
+    Object.fromEntries(sources.map(([, key, raw]) => [key, raw]))
+  );
 
-  for (const [file, raw] of Object.entries(files)) {
-    const { path } = routeFileToManifestPath(sourceKey(file));
+  for (const [file, key, raw] of sources) {
+    const path = paths.get(key);
+    if (path === undefined) {
+      throw new Error(`No route path was resolved for ${file}.`);
+    }
     if (hasDynamicRouteSegments(path)) {
       throw new Error(
         `Markdown routes do not support dynamic segments in ${file}. Use a TSX route when params are needed.`
