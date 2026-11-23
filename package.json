@@ -30,7 +30,7 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.8",
     "@cloudflare/workers-types": "^4.20260624.1",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
