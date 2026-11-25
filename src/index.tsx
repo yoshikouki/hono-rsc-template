@@ -1,12 +1,7 @@
-import {
-  createFileRouter,
-  type HonoRouteSource,
-} from "@yoshikouki/hono-file-router";
-import {
-  type RenderHtml,
-  type RenderRsc,
-  rscRenderer,
-} from "@yoshikouki/hono-rsc-renderer";
+import type { HonoRouteSource } from "@yoshikouki/hono-file-router";
+import { createFileRouter } from "@yoshikouki/hono-file-router";
+import type { RenderHtml, RenderRsc } from "@yoshikouki/hono-rsc-renderer";
+import { rscRenderer } from "@yoshikouki/hono-rsc-renderer";
 import { Hono } from "hono";
 import type { Env } from "@/bindings";
 import { AppLayout } from "@/components/app-layout";

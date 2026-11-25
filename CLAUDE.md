@@ -66,12 +66,12 @@ src/
 
 ## Routing Convention
 
-| Extension | Purpose | Example |
-|-----------|---------|---------|
-| `.tsx` | Page (RSC) | `routes/index.tsx` → `GET /` |
-| `.ts` | Hono handler | `routes/robots.txt.ts` → `GET /robots.txt` |
-| `.md` | Markdown page | `routes/hello.md` → `GET /hello` |
-| `layout.tsx` | Directory layout | `routes/layout.tsx` → root layout |
+| Extension    | Purpose          | Example                                    |
+| ------------ | ---------------- | ------------------------------------------ |
+| `.tsx`       | Page (RSC)       | `routes/index.tsx` → `GET /`               |
+| `.ts`        | Hono handler     | `routes/robots.txt.ts` → `GET /robots.txt` |
+| `.md`        | Markdown page    | `routes/hello.md` → `GET /hello`           |
+| `layout.tsx` | Directory layout | `routes/layout.tsx` → root layout          |
 
 ### Writing a Page
 
@@ -111,9 +111,7 @@ Pass `routes` to `createApp()` to register pages that don't come from the filesy
 createApp({
   site,
   globs: routeGlobs,
-  routes: [
-    { path: "/books/123", load: () => import("./BookPage") },
-  ],
+  routes: [{ path: "/books/123", load: () => import("./BookPage") }],
 });
 ```
 

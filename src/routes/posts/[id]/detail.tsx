@@ -1,4 +1,5 @@
-import { type Env, Hono } from "hono";
+import type { Env } from "hono";
+import { Hono } from "hono";
 import type { BlankSchema } from "hono/types";
 import { AppLayout } from "@/components/app-layout";
 import { PostIdForm } from "@/components/post-id-form";

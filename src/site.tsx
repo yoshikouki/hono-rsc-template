@@ -1,10 +1,8 @@
 import type { JSX, ReactElement, ReactNode } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { renderMarkdownToReact } from "@/lib/markdown/render";
-import {
-  type MarkdownFiles,
-  markdownManifestEntries,
-} from "@/lib/markdown/routes";
+import type { MarkdownFiles } from "@/lib/markdown/routes";
+import { markdownManifestEntries } from "@/lib/markdown/routes";
 import "@/globals.css";
 
 interface JsonLdContext {
