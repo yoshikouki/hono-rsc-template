@@ -26,11 +26,11 @@ bun run deploy   # deploy to Cloudflare Workers
 
 `@vitejs/plugin-rsc` manages three separate build environments:
 
-| Environment | Role | Entry |
-|---|---|---|
-| `rsc` | RSC rendering + routing | `src/index.tsx` |
-| `ssr` | Convert RSC stream to initial HTML | `@yoshikouki/hono-rsc-renderer/entry.ssr` |
-| `client` | Fetch same-path Flight and hydrate | `@yoshikouki/hono-rsc-renderer/entry.browser` |
+| Environment | Role                               | Entry                                         |
+| ----------- | ---------------------------------- | --------------------------------------------- |
+| `rsc`       | RSC rendering + routing            | `src/index.tsx`                               |
+| `ssr`       | Convert RSC stream to initial HTML | `@yoshikouki/hono-rsc-renderer/entry.ssr`     |
+| `client`    | Fetch same-path Flight and hydrate | `@yoshikouki/hono-rsc-renderer/entry.browser` |
 
 Initial page loads and Flight requests hit the same route:
 

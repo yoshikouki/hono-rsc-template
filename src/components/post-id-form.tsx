@@ -1,11 +1,7 @@
 "use client";
 
-import {
-  type ChangeEvent,
-  type SubmitEvent,
-  useCallback,
-  useState,
-} from "react";
+import type { ChangeEvent, SubmitEvent } from "react";
+import { useCallback, useState } from "react";
 
 interface PostIdFormProps {
   id: string;
