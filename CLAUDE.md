@@ -14,6 +14,7 @@ bun run build        # Production build (3-env Vite build + worker entry)
 bun run preview      # Wrangler local preview (localhost:8787, NODE_ENV=production)
 bun run deploy       # Build + deploy to Cloudflare Workers
 bun run check        # Lint/format check (Ultracite/Biome)
+bun run typecheck    # Generate Workers types and check TypeScript
 bun run fix          # Auto-fix lint/format
 bun test             # Run tests (Vitest)
 ```
@@ -41,8 +42,7 @@ src/
 │       ├── render.ts      # MD → React conversion (remark/rehype)
 │       └── components.tsx # Tailwind-styled HTML elements for markdown
 ├── routes/               # File-based routing (see below)
-├── components/           # Shared UI components
-└── bindings.ts           # Cloudflare Workers bindings type definitions
+└── components/           # Shared UI components
 ```
 
 ### RSC 3 Environments
@@ -167,7 +167,7 @@ export default createSitemapApp();
 ## Conventions
 
 - **React 19** with React Compiler (babel-plugin-react-compiler)
-- **TypeScript strict mode** with `@cloudflare/workers-types`
+- **TypeScript strict mode** with Workers types generated from `wrangler.toml`
 - Pages are Server Components by default; use `"use client"` directive only when needed
 - Cloudflare Workers env accessed via Hono context: `c.env.GREETING`, `c.env.MY_KV`, etc.
 - Server Actions (`"use server"`) are not implemented
