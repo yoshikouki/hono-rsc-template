@@ -6,7 +6,6 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = "./dist/client"
 
-# Plain env vars — available as c.env.GREETING in Hono routes
-# For KV / D1 / R2, add [[kv_namespaces]] / [[d1_databases]] etc. and declare in src/bindings.ts
+# Plain environment variables
 [vars]
 GREETING = "Hello from Cloudflare Workers env!"

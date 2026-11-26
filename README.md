@@ -16,6 +16,7 @@ A minimal template for running **React Server Components** on **Cloudflare Worke
 
 ```bash
 bun install
+bun run typecheck # generate Workers types and check TypeScript
 bun run dev      # start dev server (Vite + HMR)
 bun run build    # production build
 bun run preview  # NODE_ENV=production wrangler dev --local
@@ -55,16 +56,15 @@ src/
 ├── components/           # Shared React components and document shell
 ├── lib/
 │   └── markdown/         # Frontmatter, raw Markdown responses, Markdown routes
-├── routes/               # File-based Hono route modules
-│   ├── index.tsx         # /
-│   ├── about/index.tsx   # /about
-│   ├── hello.md          # /hello and /hello.md
-│   ├── healthz.ts        # /healthz
-│   ├── robots.txt.ts     # /robots.txt
-│   ├── sitemap.xml.ts    # /sitemap.xml
-│   ├── llms.txt.ts       # /llms.txt
-│   └── speculationrules.json.ts
-└── bindings.ts           # Cloudflare bindings type definitions
+└── routes/               # File-based Hono route modules
+    ├── index.tsx         # /
+    ├── about/index.tsx   # /about
+    ├── hello.md          # /hello and /hello.md
+    ├── healthz.ts        # /healthz
+    ├── robots.txt.ts     # /robots.txt
+    ├── sitemap.xml.ts    # /sitemap.xml
+    ├── llms.txt.ts       # /llms.txt
+    └── speculationrules.json.ts
 ```
 
 ## Adding a Page
@@ -121,7 +121,7 @@ For database or CMS routes, add normal Hono handlers and update the relevant sit
 
 ## Using Cloudflare Bindings
 
-1. Declare the binding in `wrangler.toml`:
+Declare the binding in `wrangler.toml`.
 
 ```toml
 [[kv_namespaces]]
@@ -129,15 +129,10 @@ binding = "MY_KV"
 id = "..."
 ```
 
-2. Add the type in `src/bindings.ts`:
-
-```ts
-export interface Env {
-  MY_KV: KVNamespace;
-}
-```
-
-3. Use it through `c.env` in any Hono route handler.
+Run `bun run typecheck` after changing `wrangler.toml`. Wrangler generates
+`worker-configuration.d.ts` from the configured bindings, compatibility date,
+and flags. Hono route modules can use `{ Bindings: Cloudflare.Env }` to type
+`c.env`.
 
 ## Limitations
 

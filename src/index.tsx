@@ -3,7 +3,6 @@ import { createFileRouter } from "@yoshikouki/hono-file-router";
 import type { RenderHtml, RenderRsc } from "@yoshikouki/hono-rsc-renderer";
 import { rscRenderer } from "@yoshikouki/hono-rsc-renderer";
 import { Hono } from "hono";
-import type { Env } from "@/bindings";
 import { AppLayout } from "@/components/app-layout";
 import { Document } from "@/components/document";
 import NotFound from "@/components/not-found";
@@ -16,7 +15,7 @@ interface AppOptions {
 }
 
 interface AppEnv {
-  Bindings: Env;
+  Bindings: Cloudflare.Env;
 }
 
 const routeModules = import.meta.glob<HonoRouteSource<AppEnv>>(

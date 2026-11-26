@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM"],
     "types": [
-      "@cloudflare/workers-types",
+      "./worker-configuration.d.ts",
+      "node",
       "vite/client",
       "@vitejs/plugin-rsc/types"
     ],
