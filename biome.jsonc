@@ -5,6 +5,13 @@
     "ultracite/biome/react",
     "ultracite/biome/vitest"
   ],
+  "linter": {
+    "rules": {
+      "performance": {
+        "noJsxPropsBind": "off"
+      }
+    }
+  },
   "files": {
     "includes": [
       "!**/worker-configuration.d.ts",

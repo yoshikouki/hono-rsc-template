@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, SubmitEvent } from "react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 interface PostIdFormProps {
   id: string;
@@ -14,20 +14,17 @@ function postDetailPath(id: string): string {
 export function PostIdForm({ id }: PostIdFormProps) {
   const [nextId, setNextId] = useState(id);
 
-  const handleSubmit = useCallback(
-    (event: SubmitEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const trimmed = nextId.trim();
-      if (trimmed) {
-        window.location.assign(postDetailPath(trimmed));
-      }
-    },
-    [nextId]
-  );
+  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = nextId.trim();
+    if (trimmed) {
+      window.location.assign(postDetailPath(trimmed));
+    }
+  }
 
-  const handleChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+  function handleChange(event: ChangeEvent<HTMLInputElement>) {
     setNextId(event.currentTarget.value);
-  }, []);
+  }
 
   return (
     <form

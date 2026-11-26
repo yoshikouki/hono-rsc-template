@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 export function ClickCounter() {
   const [count, setCount] = useState(0);
 
-  const handleClick = useCallback(() => {
+  function handleClick() {
     setCount((c) => c + 1);
-  }, []);
+  }
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
