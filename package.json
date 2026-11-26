@@ -30,8 +30,10 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
+    "@babel/core": "^8.1.2",
     "@biomejs/biome": "2.6.8",
     "@cloudflare/workers-types": "^4.20260624.1",
+    "@rolldown/plugin-babel": "^0.3.1",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

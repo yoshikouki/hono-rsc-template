@@ -1,16 +1,14 @@
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import rsc from "@vitejs/plugin-rsc";
 import { defineConfig } from "vite";
 
 export default defineConfig(({ mode }) => ({
   plugins: [
     mode === "test" ? null : tailwindcss(),
-    mode === "test"
-      ? null
-      : react({
-          babel: { plugins: [["babel-plugin-react-compiler"]] },
-        }),
+    mode === "test" ? null : react(),
+    mode === "test" ? null : babel({ presets: [reactCompilerPreset()] }),
     mode === "test" ? null : rsc(),
   ].filter(Boolean),
   resolve: {
