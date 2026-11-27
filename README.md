@@ -1,5 +1,10 @@
 # hono-rsc-template
 
+> This template is no longer maintained. See [hono-kit/samples](https://github.com/yoshikouki/hono-kit/tree/main/samples) for current examples.
+>
+> - [rsc-cloudflare-basic](https://github.com/yoshikouki/hono-kit/tree/main/samples/rsc-cloudflare-basic) shows how to run Hono RSC on Cloudflare Workers.
+> - [full-stack-routing](https://github.com/yoshikouki/hono-kit/tree/main/samples/full-stack-routing) combines file-based Hono routes, RSC pages, Markdown, and MDX.
+
 A minimal template for running **React Server Components** on **Cloudflare Workers** with **Hono**, powered by [`@vitejs/plugin-rsc`](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-rsc).
 
 ## Stack
